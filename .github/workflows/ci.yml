@@ -17,7 +17,7 @@ jobs:
         run: |
           set -e
           missing=0
-          for f in manifest.xml monkey.jungle source/SanctuaryApp.mc source/SanctuaryView.mc; do
+          for f in manifest.xml monkey.jungle source/SummertimeApp.mc source/SummertimeView.mc; do
             if [ ! -f "$f" ]; then
               echo "::error::Missing required file: $f"
               missing=1

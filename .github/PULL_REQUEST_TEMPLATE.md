@@ -1,4 +1,4 @@
-<!-- Thanks for contributing to Sanctuary! -->
+<!-- Thanks for contributing to Summertime! -->
 
 ## Description
 
@@ -16,7 +16,7 @@
 
 ## Devices tested
 
-<!-- Sanctuary targets the tactix 8 (Fenix 8 AMOLED). Please cover both case sizes. -->
+<!-- Summertime targets the tactix 8 (Fenix 8 AMOLED). Please cover both case sizes. -->
 
 - [ ] `fenix847mm` (454×454, 51mm)
 - [ ] `fenix843mm` (416×416, 47mm)
