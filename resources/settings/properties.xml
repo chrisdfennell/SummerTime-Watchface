@@ -1,0 +1,7 @@
+<properties>
+    <!-- Show the date line under the time -->
+    <property id="ShowDate" type="boolean">true</property>
+
+    <!-- Steps that equal a full XP bar. 0 = use ActivityMonitor's own step goal. -->
+    <property id="StepGoalOverride" type="number">0</property>
+</properties>

@@ -1,0 +1,11 @@
+<settings>
+    <!-- Toggle the date line under the time -->
+    <setting propertyKey="@Properties.ShowDate" title="@Strings.ShowDateTitle" prompt="@Strings.ShowDatePrompt">
+        <settingConfig type="boolean" />
+    </setting>
+
+    <!-- Override the steps target used by the XP bar (0 = device goal) -->
+    <setting propertyKey="@Properties.StepGoalOverride" title="@Strings.StepGoalTitle" prompt="@Strings.StepGoalPrompt">
+        <settingConfig type="numeric" min="0" max="100000" />
+    </setting>
+</settings>

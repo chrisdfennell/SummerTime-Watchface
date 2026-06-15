@@ -1,0 +1,77 @@
+========================================================================
+GARMIN CONNECT IQ STORE LISTING INFO - SUMMERTIME WATCH FACE
+========================================================================
+
+------------------------------------------------------------------------
+FIELD: Title (Max 50 characters)
+------------------------------------------------------------------------
+Summertime — Golden-Hour Beach Watch Face
+
+(Alternates: "Summertime — Beach Digital Watch Face" /
+ "Summertime: Tropical Beach Watch Face")
+
+
+------------------------------------------------------------------------
+FIELD: Description (Max 4000 characters)
+------------------------------------------------------------------------
+Summertime is a premium, high-fidelity digital watch face featuring a warm, relaxing golden-hour beach aesthetic. Experience a living sky, drifting clouds, rolling waves, and a swaying palm silhouette, all procedurally rendered. Large, outlined digital time and clean complications keep you connected and styled for summer.
+
+FEATURES & DETAILS
+• LIVING SKY GRADIENT: A procedural backdrop that shifts colors dynamically by time of day (sunrise pastels, midday azure, sunset marigold, and a starry deep night).
+• ARCING SUN & MOON: Day/night orbital progression of a glowing sun (with rotating rays and bloom) and crescent silver moon.
+• PROCEDURAL ANIMATIONS: Drifting fluffy clouds, rolling wave layers with physics, and a swaying palm tree silhouette at the beach.
+• ROTATING SECONDS: A sliced orange second indicator floating and orbiting the perimeter.
+• DYNAMIC COMPLICATIONS:
+  - Heart Icon (coral-colored, 16px with black outline) + Body Battery percentage.
+  - Water Droplet Icon (turquoise-colored, 12px with black outline) + device battery percentage.
+  - Steps Bar (XP tracker, sand/gold shoreline) + numeric steps count.
+• HIGH-CONTRAST OUTLINES: All texts (clock, date, weather, and battery metrics) feature a crisp black outline for absolute readability against the dynamic visual backdrops.
+
+BUILT FOR YOUR DISPLAY
+Summertime adapts to your panel:
+• AMOLED (Fenix 8 / tactix 8 / quatix 8 and Fenix 8 Pro): smooth gradient resource fills, specular highlights, and active background illumination.
+• MIP / Solar (tactix 8 Solar, Fenix 8 Solar): high-contrast flat fills and optimized backdrops tuned for maximum sunlight readability.
+Everything is laid out relative to your screen, so it looks right on every supported case size.
+
+ALWAYS-ON FRIENDLY
+On AMOLED, the always-on display switches to a burn-in-safe variant — dim grey time/date, thin outline representations of the battery metrics, steps progress outline, and no visual fills or background animations. All lit pixels are shifted a few pixels each minute. MIP panels always show the full face.
+
+SETTINGS
+• Show Date — toggle the date line.
+• Step Goal Override — steps for a full shoreline bar; 0 uses the watch's own step goal.
+
+PRIVACY
+Summertime uses only the SensorHistory permission to read Body Battery. It does not collect or transmit any data off your watch.
+
+SUPPORTED DEVICES
+tactix 8 (AMOLED & Solar), Fenix 8 (43/47/51mm AMOLED), Fenix 8 Solar, Fenix 8 Pro, quatix 8.
+
+Equip Summertime, and take a moment at the beach.
+
+
+------------------------------------------------------------------------
+FIELD: What's New in this Version (Max 4000 characters)
+------------------------------------------------------------------------
+Version 1.0.0 — Initial Release
+
+Summertime is now available for all Fenix 8 and tactix 8 models!
+
+• Full support for AMOLED and MIP (Solar) screens.
+• High-contrast text outlining for perfect readability against moving wave and sky backdrops.
+• Symmetrical complications layout (larger Heart and Droplet icons with clean borders).
+• Smooth time-of-day sky color gradient shifts and celestial orbits.
+
+Thanks for wearing Summertime!
+
+
+------------------------------------------------------------------------
+FIELD: Settings (Select Yes/No as indicated)
+------------------------------------------------------------------------
+Category: Watch Faces
+Subcategory: Digital
+ANT+ Profiles: No
+Regional Limits: No
+Monetization: No
+Do you collect personal or sensitive data?: No
+Is this app designed for a specific company or event?: No
+========================================================================
