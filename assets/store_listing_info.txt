@@ -44,7 +44,7 @@ PRIVACY
 Summertime uses only the SensorHistory permission to read Body Battery. It does not collect or transmit any data off your watch.
 
 SUPPORTED DEVICES
-tactix 8 (AMOLED & Solar), Fenix 8 (43/47/51mm AMOLED), Fenix 8 Solar, Fenix 8 Pro, quatix 8.
+tactix 8 (AMOLED & Solar), Fenix 8 (43/47/51mm AMOLED), Fenix 8 Solar, Fenix 8 Pro, quatix 8, Forerunner 965.
 
 Equip Summertime, and take a moment at the beach.
 
