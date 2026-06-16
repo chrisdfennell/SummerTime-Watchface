@@ -4,4 +4,9 @@
 
     <!-- Steps that equal a full XP bar. 0 = use ActivityMonitor's own step goal. -->
     <property id="StepGoalOverride" type="number">0</property>
+
+    <!-- Bottom complications. 0=Off 1=Heart Rate 2=Body Battery 3=Device Battery
+         4=Steps 5=Calories. Defaults: left=Heart Rate, right=Device Battery. -->
+    <property id="LeftComplication" type="number">1</property>
+    <property id="RightComplication" type="number">3</property>
 </properties>

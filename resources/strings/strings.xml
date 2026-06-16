@@ -7,4 +7,17 @@
 
     <string id="StepGoalTitle">Step Goal Override</string>
     <string id="StepGoalPrompt">Steps for a full XP bar. Set 0 to use the watch's own daily step goal.</string>
+
+    <!-- Complication pickers -->
+    <string id="LeftCompTitle">Bottom-Left Complication</string>
+    <string id="RightCompTitle">Bottom-Right Complication</string>
+    <string id="CompPrompt">Choose what this complication shows.</string>
+
+    <!-- Complication option labels (emoji render in the Garmin Connect app) -->
+    <string id="CompOff">Off</string>
+    <string id="CompHeartRate">❤ Heart Rate</string>
+    <string id="CompBodyBattery">⚡ Body Battery</string>
+    <string id="CompDeviceBattery">🔋 Device Battery</string>
+    <string id="CompSteps">👣 Steps</string>
+    <string id="CompCalories">🔥 Calories</string>
 </strings>
