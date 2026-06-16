@@ -336,22 +336,31 @@ dim AOD date identical between the full and partial redraws (no flicker).
 
 ---
 
-## 2026-06-16 (later) — tactix 8 still froze "while actively looking"
+## 2026-06-16 (later) — tactix 8 Solar (MIP) froze "while actively looking"
 
-Hardware report: on a real tactix 8 (AMOLED 454) the seconds marker **stopped
-moving while actively looking** (not the normal always-on transition). That means
-the per-second high-power `onUpdate` was too heavy for the device's update budget,
-so the OS stopped issuing per-second updates. The simulator does NOT enforce this
-timing, so it looked fine there. Two fixes — and crucially, **the scene keeps
-animating** (the per-minute "bake the whole scene" idea was rejected on purpose).
+Hardware report: on a real **tactix 8 Solar Elite (MIP 280, `fenix8solar51mm`)**
+the seconds marker **stopped moving while actively looking** (not the normal
+always-on transition). That means the per-second high-power `onUpdate` was too
+heavy for the device's update budget, so the OS stopped issuing per-second
+updates. The simulator does NOT enforce this timing, so it looked fine there.
 
-### Fix #12 — `BufferedBitmap` leak: allocate once, repaint in place  ⭐ Portable: YES
+⚠️ **Device-class matters — don't repeat my mistake.** I first assumed an AMOLED
+454 panel and chased a `BufferedBitmap` fix (#12). But MIP devices
+(`requiresBurnInProtection == false`) take the **flat-fill** sky path and never
+touch the buffer, and `mLowPower` is never true (no burn-in AOD). So on MIP the
+bottleneck is **draw-call COUNT on a slower CPU** (the ~100-line palm + the
+~45 outlined-text draws every second). **Fix #13 (adaptive quality) is the one
+that helps MIP; Fix #12 is AMOLED-only.** Both kept; the scene keeps animating
+(the per-minute "bake the whole scene" idea was rejected on purpose).
 
-**Regression from Fix #9.** `getSkyBitmap` called `Graphics.createBufferedBitmap`
-**every minute** (whenever the gradient colors changed). On real hardware that
-churns the graphics pool; once it's exhausted, `createBufferedBitmap` starts
-failing, we fall into the slow per-frame 86-fill fallback **forever**, and the
-face bogs down / freezes the longer you wear it.
+### Fix #12 — `BufferedBitmap` leak: allocate once, repaint in place  ⭐ Portable: YES (AMOLED only)
+
+**Regression from Fix #9 — AMOLED-only (MIP never allocates this buffer).**
+`getSkyBitmap` called `Graphics.createBufferedBitmap` **every minute** (whenever
+the gradient colors changed). On real AMOLED hardware that churns the graphics
+pool; once it's exhausted, `createBufferedBitmap` starts failing, we fall into the
+slow per-frame 86-fill fallback **forever**, and the face bogs down over time.
+(Still a real latent bug worth fixing, but it is NOT what froze the MIP tactix 8.)
 
 **Fix:** allocate the buffer ONCE (re-allocate only if the pool reclaimed it or
 the size changed), and just repaint the gradient into the *existing* buffer when
@@ -406,12 +415,15 @@ Then make each face's most expensive per-frame draws read `mQuality`. Pick the
 knobs by what's heavy in that face (here: the long outlined date text and the
 ~100-line palm). Thresholds (220/120 ms) are starting points — tune to taste.
 
-**Why both:** #12 removes a real leak that forces the slow path; #13 guarantees
-that whatever the device's true budget is, the face throttles detail (not the
-animation) to stay under it. Together they target "freezes while actively looking"
-without flattening the living scene. NOTE: verified to build (AMOLED + MIP) and
-run in the simulator, but the simulator can't reproduce the hardware update-budget
-throttle — real-device confirmation is required.
+**Why both:** #12 removes a real leak that forces the slow path on AMOLED; #13 is
+the device-agnostic fix — it's the one that matters on **MIP** (the tactix 8 Solar
+that actually froze), where the cost is draw-call count on a slower CPU. Together
+they target "freezes while actively looking" without flattening the living scene.
+NOTE: verified to build (AMOLED + MIP) and run in the simulator, but the simulator
+can't reproduce the hardware update-budget throttle — real-device confirmation is
+required. If a MIP device still hangs at q0, the next levers are: lower `Q_SLOW_MS`
+(faster shedding), and add knobs for the remaining per-frame cost (drop the 2nd
+cloud, fewer palm leaves, simpler waves).
 
 ---
 
