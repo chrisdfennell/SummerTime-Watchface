@@ -14,16 +14,16 @@ Summertime — Golden-Hour Beach Watch Face
 ------------------------------------------------------------------------
 FIELD: Description (Max 4000 characters)
 ------------------------------------------------------------------------
-Summertime is a premium, high-fidelity digital watch face featuring a warm, relaxing golden-hour beach aesthetic. Experience a living sky, drifting clouds, rolling waves, and a swaying palm silhouette, all procedurally rendered. Large, outlined digital time and configurable complications keep you connected and styled for summer.
+Summertime is a premium digital watch face with a warm, relaxing golden-hour beach aesthetic — a living sky, drifting clouds, rolling waves, and a swaying palm silhouette, all procedurally rendered. Large outlined time and configurable complications keep you connected and styled for summer.
 
 FEATURES & DETAILS
 • LIVING SKY GRADIENT: A procedural backdrop that shifts colors dynamically by time of day (sunrise pastels, midday azure, sunset marigold, and a starry deep night).
-• REAL SUNRISE & SUNSET: The sun, day/night swap, stars, and sky gradient track the actual sunrise/sunset for your location and date, so golden hour lands when it really happens (falls back to a fixed summer schedule when no location is available — no GPS is ever powered on).
-• ARCING SUN & MOON: Day/night orbital progression of a glowing sun (with rotating rays and bloom) and crescent silver moon along the real day arc.
+• REAL SUNRISE & SUNSET: The sun, day/night swap, stars, and sky gradient track the actual sunrise/sunset for your location and date, so golden hour lands when it really happens (falls back to a fixed summer schedule with no fix — no GPS is ever powered on).
+• ARCING SUN & MOON: A glowing sun (with rotating rays and bloom) and a crescent silver moon track the real day arc.
 • PROCEDURAL ANIMATIONS: Drifting fluffy clouds, rolling wave layers with physics, and a swaying palm tree silhouette at the beach.
 • LITTLE BEACH VISITORS: Every so often a visitor crosses the screen — a crab scuttles across the sand and a seagull glides down, walks a few steps, and takes off by day; a dolphin leaps and a whale breaches (with a spout and splash) from the sea. Quiet and occasional by design, and fully optional (Show Critters setting).
 • ROTATING SECONDS: A sliced orange second indicator, with a dark rind border for legibility, floating and orbiting the perimeter.
-• CONFIGURABLE COMPLICATIONS: Choose what the bottom-left and bottom-right show — Heart Rate, Body Battery, Device Battery, Steps, Calories, or Off — each with a matching themed icon (heart, bolt, battery with live fill bar, shoe, flame). Defaults: left = Heart Rate, right = Device Battery.
+• CONFIGURABLE COMPLICATIONS: Choose what the bottom-left and bottom-right show — Heart Rate, Body Battery, Device Battery, Steps, Calories, or Off — each with a matching themed icon. Defaults: left = Heart Rate, right = Device Battery.
 • STEPS SHORELINE BAR: A sand/gold steps progress bar with numeric step count, always shown beneath the time.
 • HIGH-CONTRAST OUTLINES: All texts (clock, date, weather, and metrics) feature a crisp black outline for absolute readability against the dynamic visual backdrops.
 
@@ -34,7 +34,7 @@ Summertime now runs on virtually every Connect IQ round watch and adapts to your
 Everything is laid out relative to your screen, with a correctly-sized font set baked for each resolution, so it looks right on every supported case size.
 
 ALWAYS-ON FRIENDLY
-On AMOLED, the always-on display switches to a burn-in-safe variant — dim grey time/date, thin outline representations of the complications, steps progress outline, and no visual fills or background animations. All lit pixels are shifted a few pixels each minute. MIP panels always show the full face.
+On AMOLED, the always-on display uses a burn-in-safe variant — dim grey time/date, thin complication outlines, no fills or animations — with all lit pixels shifted slightly each minute. MIP panels always show the full face.
 
 SETTINGS
 • Show Date — toggle the date line.
@@ -46,7 +46,7 @@ PRIVACY
 Summertime uses only the SensorHistory permission to read Body Battery. Sunrise/sunset is computed from your watch's last-known location (it does not turn on GPS). It does not collect or transmit any data off your watch.
 
 SUPPORTED DEVICES
-Every Connect IQ 4.0+ round watch that supports watch faces, including: Forerunner 165 / 255 / 265 / 570 / 955 / 965 / 970; fenix 7 & 8 (incl. S/X/Pro, AMOLED & Solar), fenix E, epix 2 / Pro, enduro 3; tactix 8; Venu 2 / 3, Venu 4, Vivoactive 5 / 6; Instinct 3 / E / Crossover (AMOLED); and the Approach (golf), Descent (dive), D2 (aviation), and MARQ specialty watches. (Square/rectangular panels and Edge/handheld GPS units are not supported.)
+Every Connect IQ 4.0+ round watch that supports watch faces — Forerunner (incl. 965/970), fenix 7/8 (S/X/Pro, AMOLED & Solar), fenix E, epix 2/Pro, enduro 3, tactix 8, Venu 2/3/4, Vivoactive 5/6, Instinct 3/E/Crossover, and the Approach/Descent/D2/MARQ specialty watches. (Square/rectangular and Edge/handheld units aren't supported.)
 
 Equip Summertime, and take a moment at the beach.
 
