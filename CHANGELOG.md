@@ -4,6 +4,11 @@ All notable changes to Summertime are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project aims to
 follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.2] - 2026-06-16
+
+### Changed
+- **Seconds marker hides when the watch sleeps**: the orbiting "tiny sun" seconds marker only animates while the watch is in its active (high-power) window — roughly the ~15 seconds after a wrist raise, which is when Garmin updates a watch face every second. Rather than leave it parked/frozen between updates, it now cleanly disappears in low-power and reappears when you raise your wrist. (Gated on the sleep state so it behaves correctly on MIP devices too, not just AMOLED always-on.)
+
 ## [1.3.1] - 2026-06-16
 
 ### Fixed

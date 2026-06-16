@@ -438,8 +438,11 @@ class SummertimeView extends WatchUi.WatchFace {
 
         // --- Orbiting "tiny sun" seconds marker (citrus slice) -------------
         // Drawn LAST so it always sits ABOVE the time, date, complications and
-        // steps bar, instead of being hidden behind the bottom text.
-        if (!mLowPower) {
+        // steps bar. Only shown while the watch is ACTIVE (high power); the OS
+        // stops per-second updates ~15s after a wrist raise, so rather than leave
+        // the marker parked/frozen we hide it until the watch wakes again. Gated
+        // on mIsSleep (not mLowPower) because MIP devices never set mLowPower.
+        if (!mIsSleep) {
             var secAngle = (secVal * 6.0) * Math.PI / 180.0;
             var secRadius = (w * 0.44).toNumber() - 10;
             var csx = cx + (secRadius * Math.sin(secAngle)).toNumber();

@@ -54,6 +54,14 @@ Equip Summertime, and take a moment at the beach.
 ------------------------------------------------------------------------
 FIELD: What's New in this Version (Max 4000 characters)
 ------------------------------------------------------------------------
+Version 1.3.2
+
+• CLEANER SECONDS MARKER: The orbiting sun seconds marker now tucks away when the watch is resting and sweeps back in when you raise your wrist, instead of sitting still between updates.
+
+Thanks for wearing Summertime!
+
+---
+
 Version 1.3.1
 
 • SMOOTHER & MORE RELIABLE: Fixed a freeze where the seconds marker could stop moving while you were looking at the watch. The scene now stays lively without bogging down over time.

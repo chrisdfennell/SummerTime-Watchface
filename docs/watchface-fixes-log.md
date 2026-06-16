@@ -427,6 +427,42 @@ cloud, fewer palm leaves, simpler waves).
 
 ---
 
+## 2026-06-16 (later still) — the "seconds marker stops after ~15s" is NOT a bug
+
+The real story behind the freeze reports: the orbiting seconds marker stopped
+moving **~15 seconds** after a wrist raise. That is the **normal Garmin high-power
+window**, not a performance freeze:
+- **High power** (~10–15 s after a gesture): `onUpdate` runs once per *second* —
+  the marker animates.
+- **Low power** (the rest of the time): `onUpdate` runs once per *minute*; only
+  `onPartialUpdate` fires per-second (and only if you implement it). With nothing
+  driving the marker per-second, it parks.
+
+No amount of render optimization changes this — it's the OS protecting battery.
+The perf fixes (#9–#13) still matter for *active-window smoothness*, but they were
+never the cause of "the marker stops."
+
+### Fix #14 — Decide the marker's low-power behavior; gate on `mIsSleep`
+
+Three valid choices (this face chose **hide**):
+1. **Hide when not active** (chosen) — don't draw the marker in low power, so it
+   cleanly disappears instead of sitting frozen. Zero battery cost.
+2. **Continuous sweep** — draw the marker every second in `onPartialUpdate` (needs
+   a scene snapshot to erase the old position cleanly). Always moves, but wakes the
+   CPU every second → real battery drain. This is how analog second hands work.
+3. **Leave parked** — the stock default; marker freezes between minute updates.
+
+```monkeyc
+// Gate on mIsSleep (set by onEnterSleep/onExitSleep), NOT mLowPower:
+if (!mIsSleep) { /* draw + animate the seconds marker */ }
+```
+⚠️ **Critical for MIP:** use `mIsSleep`, not `mLowPower`. `mLowPower` is only true
+on AMOLED burn-in/always-on; on MIP it is *never* true, so a `!mLowPower` gate would
+never hide the marker (it'd stay parked/frozen in low power). `mIsSleep` is the
+correct active-vs-low-power signal on every device class.
+
+---
+
 ## Notes / general rules
 - **"Is it the freeze?"** — audit, in order: anything in `onPartialUpdate`
   (must be cheap + clipped), any `while` loop fed by float math (NaN/Inf = hang),
