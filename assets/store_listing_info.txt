@@ -21,6 +21,7 @@ FEATURES & DETAILS
 • REAL SUNRISE & SUNSET: The sun, day/night swap, stars, and sky gradient track the actual sunrise/sunset for your location and date, so golden hour lands when it really happens (falls back to a fixed summer schedule when no location is available — no GPS is ever powered on).
 • ARCING SUN & MOON: Day/night orbital progression of a glowing sun (with rotating rays and bloom) and crescent silver moon along the real day arc.
 • PROCEDURAL ANIMATIONS: Drifting fluffy clouds, rolling wave layers with physics, and a swaying palm tree silhouette at the beach.
+• LITTLE BEACH VISITORS: Every so often a visitor crosses the screen — a crab scuttles across the sand and a seagull glides down, walks a few steps, and takes off by day; a dolphin leaps and a whale breaches (with a spout and splash) from the sea. Quiet and occasional by design, and fully optional (Show Critters setting).
 • ROTATING SECONDS: A sliced orange second indicator, with a dark rind border for legibility, floating and orbiting the perimeter.
 • CONFIGURABLE COMPLICATIONS: Choose what the bottom-left and bottom-right show — Heart Rate, Body Battery, Device Battery, Steps, Calories, or Off — each with a matching themed icon (heart, bolt, battery with live fill bar, shoe, flame). Defaults: left = Heart Rate, right = Device Battery.
 • STEPS SHORELINE BAR: A sand/gold steps progress bar with numeric step count, always shown beneath the time.
@@ -37,6 +38,7 @@ On AMOLED, the always-on display switches to a burn-in-safe variant — dim grey
 
 SETTINGS
 • Show Date — toggle the date line.
+• Show Critters — toggle the little beach visitors (crab, seagull, dolphin, whale).
 • Step Goal Override — steps for a full shoreline bar; 0 uses the watch's own step goal.
 • Bottom-Left Complication / Bottom-Right Complication — pick Heart Rate, Body Battery, Device Battery, Steps, Calories, or Off for each side.
 
@@ -52,6 +54,16 @@ Equip Summertime, and take a moment at the beach.
 ------------------------------------------------------------------------
 FIELD: What's New in this Version (Max 4000 characters)
 ------------------------------------------------------------------------
+Version 1.3.0
+
+• BEACH CRITTERS: Little visitors now cross the screen once in a while — a crab scuttles across the sand and a seagull glides down, walks, and takes off by day; a dolphin leaps and a whale breaches (with a spout and splash) from the sea, day or night. They're brief and occasional, and can be turned off with the new Show Critters setting.
+• SMOOTHER & STEADIER: Fixed an issue that could cause the face to freeze in always-on mode, and significantly reduced the per-second rendering cost (cached sky gradient and per-frame lookups) for better battery and responsiveness.
+• POLISH: The orbiting citrus-slice seconds marker now sits above the time and complications instead of behind them, plus assorted reliability fixes.
+
+Thanks for wearing Summertime!
+
+---
+
 Version 1.2.0
 
 • CONFIGURABLE COMPLICATIONS: Set the bottom-left and bottom-right to Heart Rate, Body Battery, Device Battery, Steps, Calories, or Off — each with its own themed icon. Device Battery now shows a battery icon with a live fill bar. Defaults: left = Heart Rate, right = Device Battery.
