@@ -9,4 +9,7 @@
          4=Steps 5=Calories. Defaults: left=Heart Rate, right=Device Battery. -->
     <property id="LeftComplication" type="number">1</property>
     <property id="RightComplication" type="number">3</property>
+
+    <!-- Let little beach visitors cross the screen once in a while -->
+    <property id="ShowCritters" type="boolean">true</property>
 </properties>

@@ -52,11 +52,18 @@ class SummertimeView extends WatchUi.WatchFace {
     private const COMP_STEPS    = 4;  // step count
     private const COMP_CALORIES = 5;  // calories (kcal)
 
+    // --- Critter ids (the little beach visitors that cross the screen) ---
+    private const CR_CRAB    = 0;  // beach (ground), day or night - scuttles sideways
+    private const CR_SEAGULL = 1;  // flies in, lands on the sand, walks, takes off (day)
+    private const CR_DOLPHIN = 2;  // leaps from the sea in an arc, day or night
+    private const CR_WHALE   = 3;  // breaches from the sea, day or night
+
     // --- Settings (see resources/settings) ---
     private var mShowDate as Boolean = true;
     private var mStepGoalOverride as Number = 0;  // 0 => use device step goal
     private var mLeftComp as Number = COMP_HR;       // bottom-left complication
     private var mRightComp as Number = COMP_BATTERY; // bottom-right complication
+    private var mShowCritters as Boolean = true;     // the crossing beach visitors
 
     // --- Heart-rate cache (sensor read throttled to once every ~10s) ---
     private var mCachedHr as Number or Null = null;
@@ -67,6 +74,10 @@ class SummertimeView extends WatchUi.WatchFace {
     private var mSunValid as Boolean = false;  // true once a real location fix was used
     private var mSunrise as Float = 6.0;       // local hours; defaults = fixed summer schedule
     private var mSunset as Float = 18.0;
+    private var mSunLastTry as Number = -10000; // epoch sec of last (not-yet-valid) sun retry
+
+    // --- Per-frame cache of device settings (read once per redraw) ---
+    private var mSettings as System.DeviceSettings or Null = null;
 
     // --- Fonts (vector fonts with safe fallbacks) ---
     private var mFontTime as Graphics.FontType or Null = null;
@@ -96,6 +107,35 @@ class SummertimeView extends WatchUi.WatchFace {
 
     private const BG_COLOR = 0x000000;        // pitch black for AMOLED contrast/battery
 
+    // --- Hoisted constants (avoid re-allocating these arrays every frame) ---
+    // Star field positions, expressed against a 454x454 reference and scaled.
+    private const STAR_X = [70, 120, 180, 240, 310, 380, 90, 150, 220, 290, 360, 130, 200, 270, 340, 110, 250, 330] as Array<Number>;
+    private const STAR_Y = [50, 70, 45, 60, 55, 75, 110, 95, 120, 105, 115, 160, 150, 175, 155, 200, 210, 195] as Array<Number>;
+    // Sky gradient keyframe colors (identical for the real-sun and fallback schedules).
+    private const SKY_TOP    = [0x050515, 0x0A0E29, 0x4A7A96, 0x1D8CF8, 0x1DA1F2, 0x3A86C8, 0xFF6F7D, 0x0F1123, 0x050515] as Array<Number>;
+    private const SKY_BOTTOM = [0x0A0A25, 0x2C1B4D, 0xFF7B60, 0x8FE5D9, 0xFFF4E0, 0xFFAD87, 0xFFC043, 0x5C2E58, 0x0A0A25] as Array<Number>;
+    // Fixed-summer fallback keyframe hours, used when no real sun fix is available.
+    private const SKY_HOURS_FALLBACK = [0.0, 5.0, 7.0, 10.0, 14.0, 17.0, 19.5, 21.0, 24.0] as Array<Float>;
+
+    // Reusable polygon buffer for the rolling waves (filled in place each frame
+    // instead of allocating a new array + point pairs on every redraw).
+    private var mWavePts as Array or Null = null;
+
+    // --- Per-frame caches (read once per redraw to avoid duplicate syscalls) ---
+    private var mClock as System.ClockTime or Null = null;
+    private var mActInfo as ActivityMonitor.Info or Null = null;
+
+    // --- Cached AMOLED sky-gradient buffer ---------------------------------
+    // The gradient colors depend only on hour+minute, so they change at most
+    // once a minute. We render the ~86-row fill into a buffered bitmap once and
+    // just blit it on subsequent (per-second) frames, re-rendering only when the
+    // colors or dimensions change. Only used on AMOLED (MIP uses a flat fill).
+    private var mSkyBufRef as Graphics.BufferedBitmapReference or Null = null;
+    private var mSkyKeyTop as Number = -1;
+    private var mSkyKeyBottom as Number = -1;
+    private var mSkyKeyW as Number = -1;
+    private var mSkyKeyH as Number = -1;
+
     function initialize() {
         WatchFace.initialize();
         loadSettings();
@@ -109,10 +149,12 @@ class SummertimeView extends WatchUi.WatchFace {
                 var stepGoal = Application.Properties.getValue("StepGoalOverride");
                 var leftComp = Application.Properties.getValue("LeftComplication");
                 var rightComp = Application.Properties.getValue("RightComplication");
+                var critters = Application.Properties.getValue("ShowCritters");
                 if (showDate != null) { mShowDate = showDate; }
                 if (stepGoal != null) { mStepGoalOverride = stepGoal; }
                 if (leftComp != null) { mLeftComp = leftComp; }
                 if (rightComp != null) { mRightComp = rightComp; }
+                if (critters != null) { mShowCritters = critters; }
             }
         } catch (e) {
             // keep defaults
@@ -167,17 +209,16 @@ class SummertimeView extends WatchUi.WatchFace {
         var w = mWidth;
         var h = mHeight;
 
-        var burnIn = false;
+        var settings = System.getDeviceSettings();
+        mSettings = settings;  // cache for drawTime / getWeatherString this frame
+        var hasBurnIn = (settings has :requiresBurnInProtection) && settings.requiresBurnInProtection;
+        var burnIn = hasBurnIn && mIsSleep;
         var dx = 0;
         var dy = 0;
-        var settings = System.getDeviceSettings();
-        var hasBurnIn = (settings has :requiresBurnInProtection) && settings.requiresBurnInProtection;
-        if (hasBurnIn && mIsSleep) {
-            burnIn = true;
-            var phase = System.getClockTime().min % 4;
-            if (phase == 1)      { dx = 4;  dy = 2; }
-            else if (phase == 2) { dx = -3; dy = 4; }
-            else if (phase == 3) { dx = 3;  dy = -4; }
+        if (burnIn) {
+            var shift = computeBurnInShift();
+            dx = shift[0];
+            dy = shift[1];
         }
         mLowPower = burnIn;
         mFlatGlobes = !hasBurnIn;
@@ -189,8 +230,10 @@ class SummertimeView extends WatchUi.WatchFace {
         dc.setColor(BG_COLOR, BG_COLOR);
         dc.clear();
 
-        // Time values
+        // Time values (cache the clock + activity info once for this redraw)
         var clockTime = System.getClockTime();
+        mClock = clockTime;
+        mActInfo = ActivityMonitor.getInfo();
         var hour = clockTime.hour;
         var min = clockTime.min;
         var secVal = clockTime.sec;
@@ -212,13 +255,21 @@ class SummertimeView extends WatchUi.WatchFace {
                 dc.setColor(cTop, cTop);
                 dc.fillRectangle(0, 0, w, skyH);
             } else {
-                // AMOLED: Draw smooth gradient
-                var step = 4;
-                for (var y = 0; y < skyH; y += step) {
-                    var frac = y.toFloat() / skyH.toFloat();
-                    var c = lerpColor(cTop, cBottom, frac);
-                    dc.setColor(c, Graphics.COLOR_TRANSPARENT);
-                    dc.fillRectangle(0, y, w, step);
+                // AMOLED: smooth gradient, cached in a buffer so the per-row fill
+                // loop runs at most once a minute (when the colors change) rather
+                // than on every per-second redraw.
+                var skyBmp = getSkyBitmap(w, skyH, cTop, cBottom);
+                if (skyBmp != null) {
+                    dc.drawBitmap(0, 0, skyBmp);
+                } else {
+                    // Fallback: render the gradient directly (no buffered bitmap).
+                    var step = 4;
+                    for (var y = 0; y < skyH; y += step) {
+                        var frac = y.toFloat() / skyH.toFloat();
+                        var c = lerpColor(cTop, cBottom, frac);
+                        dc.setColor(c, Graphics.COLOR_TRANSPARENT);
+                        dc.fillRectangle(0, y, w, step);
+                    }
                 }
             }
 
@@ -227,11 +278,9 @@ class SummertimeView extends WatchUi.WatchFace {
             var isNight = !(tNow >= mSunrise && tNow < mSunset);
             if (isNight) {
                 dc.setColor(0xFFFFFF, Graphics.COLOR_TRANSPARENT);
-                var starX = [70, 120, 180, 240, 310, 380, 90, 150, 220, 290, 360, 130, 200, 270, 340, 110, 250, 330] as Array<Number>;
-                var starY = [50, 70, 45, 60, 55, 75, 110, 95, 120, 105, 115, 160, 150, 175, 155, 200, 210, 195] as Array<Number>;
-                for (var i = 0; i < starX.size(); i++) {
-                    var sx = (starX[i] * w / 454).toNumber();
-                    var sy = (starY[i] * h / 454).toNumber();
+                for (var i = 0; i < STAR_X.size(); i++) {
+                    var sx = (STAR_X[i] * w / 454).toNumber();
+                    var sy = (STAR_Y[i] * h / 454).toNumber();
                     dc.drawPoint(sx, sy);
                 }
             }
@@ -303,16 +352,29 @@ class SummertimeView extends WatchUi.WatchFace {
 
             // E. Draw Drifting Clouds
             var cloudOffset = (min * 60 + secVal).toFloat();
-            var cx1 = ((w * 0.1 + (cloudOffset * 0.08)).toNumber()) % (w + 80) - 40;
-            var cx2 = ((w * 0.7 - (cloudOffset * 0.05)).toNumber()) % (w + 80) - 40;
+            var span = w + 80;
+            // Positive modulo: Monkey C's % keeps the sign of the dividend, so a
+            // negative drift (cloud 2) would otherwise wrap off-screen.
+            var cx1 = (((((w * 0.1 + (cloudOffset * 0.08)).toNumber()) % span) + span) % span) - 40;
+            var cx2 = (((((w * 0.7 - (cloudOffset * 0.05)).toNumber()) % span) + span) % span) - 40;
             drawCloud(dc, cx1, (h * 0.20).toNumber());
             drawCloud(dc, cx2, (h * 0.28).toNumber());
 
-            // F. Draw Rolling Waves (sine-wave polygons)
+            // Resolve which little visitor (if any) is crossing right now, so a
+            // breaching sea creature can be drawn between the wave layers and a
+            // shore visitor in front of the beach.
+            var crit = mShowCritters ? computeCritter(hour, min, secVal, isNight) : null;
+
+            // F. Draw Rolling Waves (sine-wave polygons). A breaching whale or
+            //    leaping dolphin is drawn between the back and front wave so the
+            //    water hides the base of the splash.
             var wavePhase1 = secVal.toFloat() * 0.07;
             var wavePhase2 = -secVal.toFloat() * 0.10;
             // Back wave
             drawWave(dc, (h * 0.76).toNumber(), 5, 45.0, wavePhase1, 0x1A6B9C);
+            if (crit != null && isWaterCritter(crit[0] as Number)) {
+                drawCritter(dc, crit);
+            }
             // Front wave
             drawWave(dc, (h * 0.80).toNumber(), 6, 35.0, wavePhase2, 0x40C0B0);
 
@@ -325,12 +387,11 @@ class SummertimeView extends WatchUi.WatchFace {
             var palmSway = 0.08 * Math.sin(secVal.toFloat() * 0.15);
             drawPalmTree(dc, (w * 0.86).toNumber(), beachY, (w * 0.80).toNumber(), (h * 0.54).toNumber(), palmSway);
 
-            // I. Draw Citrus Slice Seconds orbiting
-            var secAngle = (secVal * 6.0) * Math.PI / 180.0;
-            var secRadius = (w * 0.44).toNumber() - 10;
-            var csx = cx + (secRadius * Math.sin(secAngle)).toNumber();
-            var csy = cy - (secRadius * Math.cos(secAngle)).toNumber();
-            drawCitrusSlice(dc, csx, csy);
+            // I. Shore visitors (crab scuttling, seagull flying / walking) are
+            //    drawn in front of the beach and palm.
+            if (crit != null && !isWaterCritter(crit[0] as Number)) {
+                drawCritter(dc, crit);
+            }
         }
 
         // --- Center Clock & Date ---
@@ -356,20 +417,43 @@ class SummertimeView extends WatchUi.WatchFace {
         drawXpBar(dc, cx, barY, barW, barH, stepsFraction);
         
         if (!burnIn) {
-            var actInfo = ActivityMonitor.getInfo();
+            var actInfo = mActInfo;
             var steps = (actInfo != null && actInfo.steps != null) ? actInfo.steps : 0;
             var stepsStr = steps.format("%d") + " STEPS";
             drawTextWithOutline(dc, cx, barY - 14, mFontLabel, stepsStr, Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER, 0xFFFFFF);
         }
+
+        // --- Orbiting "tiny sun" seconds marker (citrus slice) -------------
+        // Drawn LAST so it always sits ABOVE the time, date, complications and
+        // steps bar, instead of being hidden behind the bottom text.
+        if (!mLowPower) {
+            var secAngle = (secVal * 6.0) * Math.PI / 180.0;
+            var secRadius = (w * 0.44).toNumber() - 10;
+            var csx = cx + (secRadius * Math.sin(secAngle)).toNumber();
+            var csy = cy - (secRadius * Math.cos(secAngle)).toNumber();
+            drawCitrusSlice(dc, csx, csy);
+        }
+    }
+
+    // Anti-burn-in pixel shift for AMOLED always-on mode. Cycles through a few
+    // small offsets so static pixels are not lit identically minute after minute.
+    private function computeBurnInShift() as Array<Number> {
+        var clock = (mClock != null) ? mClock : System.getClockTime();
+        var phase = clock.min % 4;
+        if (phase == 1)      { return [4, 2] as Array<Number>; }
+        else if (phase == 2) { return [-3, 4] as Array<Number>; }
+        else if (phase == 3) { return [3, -4] as Array<Number>; }
+        return [0, 0] as Array<Number>;
     }
 
     // ------------------------------------------------------------------ Elements
 
     function drawTime(dc as Dc, cx as Number, cy as Number) as Void {
-        var clock = System.getClockTime();
+        var clock = (mClock != null) ? mClock : System.getClockTime();
         var hour = clock.hour;
         var min = clock.min;
-        var is24 = System.getDeviceSettings().is24Hour;
+        var settings = (mSettings != null) ? mSettings : System.getDeviceSettings();
+        var is24 = settings.is24Hour;
         if (!is24) {
             hour = hour % 12;
             if (hour == 0) { hour = 12; }
@@ -387,8 +471,10 @@ class SummertimeView extends WatchUi.WatchFace {
         var info = Gregorian.info(Time.now(), Time.FORMAT_MEDIUM);
         var dateStr = info.day_of_week.toUpper() + "   " + info.month.toUpper() + " " + info.day;
         
-        // Append weather if available
-        var weatherStr = getWeatherString();
+        // Append weather if available. Skipped in always-on/low-power so the
+        // weather lookup never runs inside the partial-update budget (and so the
+        // dim AOD date stays consistent between full and partial redraws).
+        var weatherStr = mLowPower ? null : getWeatherString();
         if (weatherStr != null) {
             dateStr = dateStr + "   •   " + weatherStr;
         }
@@ -413,17 +499,25 @@ class SummertimeView extends WatchUi.WatchFace {
         
         var steps = 12;
         var stepW = w / steps;
-        var points = new [steps + 3] as Array<Array>;
-        points[0] = [w, h];
-        points[1] = [0, h];
-        
+        // Reuse a persistent buffer (and its point pairs) instead of allocating
+        // a fresh array + 15 sub-arrays on every frame.
+        if (mWavePts == null) {
+            var buf = new [steps + 3] as Array<Array>;
+            for (var k = 0; k < steps + 3; k++) { buf[k] = [0, 0]; }
+            mWavePts = buf;
+        }
+        var points = mWavePts;
+        points[0][0] = w; points[0][1] = h;
+        points[1][0] = 0; points[1][1] = h;
+
         for (var i = 0; i <= steps; i++) {
             var x = i * stepW;
             var angle = (x.toFloat() / waveLen) + phase;
             var y = yBase + (amp * Math.sin(angle)).toNumber();
-            points[i + 2] = [x, y];
+            points[i + 2][0] = x;
+            points[i + 2][1] = y;
         }
-        
+
         dc.setColor(color, Graphics.COLOR_TRANSPARENT);
         dc.fillPolygon(points);
     }
@@ -676,7 +770,7 @@ class SummertimeView extends WatchUi.WatchFace {
     // ------------------------------------------------------------------- Data
 
     function getStepFraction() as Float {
-        var info = ActivityMonitor.getInfo();
+        var info = (mActInfo != null) ? mActInfo : ActivityMonitor.getInfo();
         if (info == null || info.steps == null) { return 0.0; }
         var steps = info.steps;
         var goal = mStepGoalOverride;
@@ -755,12 +849,12 @@ class SummertimeView extends WatchUi.WatchFace {
     }
 
     function getSteps() as Number {
-        var info = ActivityMonitor.getInfo();
+        var info = (mActInfo != null) ? mActInfo : ActivityMonitor.getInfo();
         return (info != null && info.steps != null) ? info.steps : 0;
     }
 
     function getCalories() as Number {
-        var info = ActivityMonitor.getInfo();
+        var info = (mActInfo != null) ? mActInfo : ActivityMonitor.getInfo();
         return (info != null && info.calories != null) ? info.calories : 0;
     }
 
@@ -902,6 +996,329 @@ class SummertimeView extends WatchUi.WatchFace {
         dc.fillCircle(x, y + 2, 4);
     }
 
+    // ------------------------------------------------------------ Critters
+
+    // Decide which little visitor (if any) is crossing the screen right now.
+    // Returns [type, dir, frac, seed] or null. At most one critter is ever active,
+    // and quiet periods leave the beach empty so it stays calm ("once in a while").
+    private function computeCritter(hour as Number, min as Number, sec as Number, isNight as Boolean) as Array or Null {
+        var PERIOD = 38.0;  // a visitor may appear once per this many seconds
+        var CROSS  = 8.0;   // how long the crossing animation lasts
+
+        var tDay = (hour * 3600 + min * 60 + sec).toFloat();
+        var period = (tDay / PERIOD).toNumber();
+        var local = tDay - period * PERIOD;
+
+        // ~1 in 5 windows is a quiet stretch with no visitor at all.
+        if (period % 5 == 0) { return null; }
+        if (local >= CROSS) { return null; }
+
+        var frac = local / CROSS;          // 0..1 progress across the screen
+        var dir = ((period * 31 + 7) % 2 == 0) ? 1 : -1;
+        var sel = (period * 17 + 5) % 4;
+
+        var type;
+        if (isNight) {
+            // night pool: crabs are nocturnal; dolphins/whales still surface.
+            // No seagulls at night.
+            var nightPool = [CR_CRAB, CR_DOLPHIN, CR_CRAB, CR_WHALE] as Array<Number>;
+            type = nightPool[sel];
+        } else {
+            // day pool: crab (weighted), seagull, dolphin, whale.
+            var dayPool = [CR_CRAB, CR_SEAGULL, CR_DOLPHIN, CR_WHALE] as Array<Number>;
+            type = dayPool[sel];
+        }
+        return [type, dir, frac, period] as Array;
+    }
+
+    // Water critters breach from the sea (drawn between the wave layers); the
+    // others walk/fly along the shore (drawn in front of the beach).
+    private function isWaterCritter(type as Number) as Boolean {
+        return type == CR_DOLPHIN || type == CR_WHALE;
+    }
+
+    // Draw the active critter, positioning it for its type.
+    private function drawCritter(dc as Dc, crit as Array) as Void {
+        var w = mWidth;
+        var h = mHeight;
+        var type = crit[0] as Number;
+        var dir = crit[1] as Number;
+        var frac = crit[2] as Float;
+        var seed = crit[3] as Number;
+
+        var margin = (w * 0.18).toNumber();
+        var span = w + 2 * margin;
+        var x;
+        if (dir == 1) {
+            x = (-margin + frac * span).toNumber();
+        } else {
+            x = (w + margin - frac * span).toNumber();
+        }
+
+        if (type == CR_CRAB) {
+            var groundY = (h * 0.93).toNumber();
+            drawCrab(dc, x, groundY, dir, frac, (w * 0.04).toNumber());
+        } else if (type == CR_SEAGULL) {
+            // sky -> beach -> sky: glide down, walk a few steps, then take off.
+            var skyY = (h * 0.30).toNumber();
+            var beachWalkY = (h * 0.90).toNumber();
+            var walking = false;
+            var y;
+            if (frac < 0.35) {
+                y = (skyY + (beachWalkY - skyY) * (frac / 0.35)).toNumber();
+            } else if (frac < 0.65) {
+                y = beachWalkY;
+                walking = true;
+            } else {
+                y = (beachWalkY + (skyY - beachWalkY) * ((frac - 0.65) / 0.35)).toNumber();
+            }
+            drawSeagull(dc, x, y, dir, frac, walking, (w * 0.05).toNumber());
+        } else if (type == CR_DOLPHIN) {
+            var waterY = (h * 0.79).toNumber();
+            var leapH = (h * 0.18).toNumber();
+            var y = (waterY - leapH * Math.sin(frac * Math.PI)).toNumber();
+            drawDolphin(dc, x, y, dir, (frac < 0.5), (w * 0.06).toNumber());
+        } else if (type == CR_WHALE) {
+            var waterY = (h * 0.80).toNumber();
+            var breachH = (h * 0.24).toNumber();
+            var y = (waterY - breachH * Math.sin(frac * Math.PI)).toNumber();
+            drawWhale(dc, x, y, dir, frac, (w * 0.11).toNumber());
+        }
+    }
+
+    // Shear mapping used by the sea creatures: body space (bx = forward toward
+    // the travel direction, by = up) -> screen, with a vertical `tilt` shear so
+    // the body can lean nose-up/down as it arcs out of the water.
+    private function crX(x as Number, dir as Number, bx as Float) as Number {
+        return (x + dir * bx).toNumber();
+    }
+    private function crY(y as Number, bx as Float, by as Float, tilt as Float) as Number {
+        return (y - by - tilt * bx).toNumber();
+    }
+
+    // ---- Crab (scuttles sideways across the sand) ----
+    private function drawCrab(dc as Dc, x as Number, y as Number, dir as Number, frac as Float, s as Number) as Void {
+        if (s < 7) { s = 7; }
+        var legPhase = frac * Math.PI * 18.0;  // fast scurry
+        // black outline (4 diagonal offsets)
+        crabSil(dc, x - 1, y - 1, dir, s, legPhase, 0x000000);
+        crabSil(dc, x + 1, y - 1, dir, s, legPhase, 0x000000);
+        crabSil(dc, x - 1, y + 1, dir, s, legPhase, 0x000000);
+        crabSil(dc, x + 1, y + 1, dir, s, legPhase, 0x000000);
+        // orange-red body
+        crabSil(dc, x, y, dir, s, legPhase, 0xE2552E);
+        // eyes on little stalks
+        var ex1 = (x - s * 0.3).toNumber();
+        var ex2 = (x + s * 0.3).toNumber();
+        var stalkTop = (y - s * 0.95).toNumber();
+        dc.setColor(0xE2552E, Graphics.COLOR_TRANSPARENT);
+        dc.setPenWidth(2);
+        dc.drawLine(ex1, (y - s * 0.4).toNumber(), ex1, stalkTop);
+        dc.drawLine(ex2, (y - s * 0.4).toNumber(), ex2, stalkTop);
+        dc.setPenWidth(1);
+        dc.setColor(0x201008, Graphics.COLOR_TRANSPARENT);
+        dc.fillCircle(ex1, stalkTop, 2);
+        dc.fillCircle(ex2, stalkTop, 2);
+    }
+
+    private function crabSil(dc as Dc, x as Number, y as Number, dir as Number, s as Number, legPhase as Float, c as Number) as Void {
+        dc.setColor(c, Graphics.COLOR_TRANSPARENT);
+        // domed shell (wide oval)
+        dc.fillRoundedRectangle((x - s).toNumber(), (y - s * 0.45).toNumber(), (2 * s).toNumber(), (s * 0.9).toNumber(), (s * 0.45).toNumber());
+        dc.fillCircle(x, (y - s * 0.15).toNumber(), (s * 0.7).toNumber());
+        // 3 legs per side, scurrying
+        dc.setPenWidth(2);
+        for (var i = 0; i < 3; i++) {
+            var wob = (Math.sin(legPhase + i * 1.3) * s * 0.18).toNumber();
+            var ly = (y + s * 0.1 + i * s * 0.28).toNumber();
+            dc.drawLine((x - s * 0.6).toNumber(), ly, (x - s * 1.4).toNumber(), ly + wob);
+            dc.drawLine((x + s * 0.6).toNumber(), ly, (x + s * 1.4).toNumber(), ly - wob);
+        }
+        dc.setPenWidth(1);
+        // two raised claws (the larger one leads in the travel direction)
+        dc.fillCircle((x + dir * s * 1.05).toNumber(), (y - s * 0.25).toNumber(), (s * 0.38).toNumber());
+        dc.fillCircle((x - dir * s * 1.05).toNumber(), (y - s * 0.1).toNumber(), (s * 0.28).toNumber());
+    }
+
+    // ---- Seagull (flies in, lands and walks, then takes off) ----
+    private function drawSeagull(dc as Dc, x as Number, y as Number, dir as Number, frac as Float, walking as Boolean, s as Number) as Void {
+        if (s < 8) { s = 8; }
+        if (walking) {
+            seagullWalk(dc, x, y, dir, frac, s);
+        } else {
+            seagullFly(dc, x, y, dir, Math.sin(frac * Math.PI * 9.0), s);
+        }
+    }
+
+    private function seagullFly(dc as Dc, x as Number, y as Number, dir as Number, flap as Float, s as Number) as Void {
+        var tipY = (y - flap * s * 0.7).toNumber();
+        // body (white with a thin dark outline)
+        dc.setColor(0x000000, Graphics.COLOR_TRANSPARENT);
+        dc.fillCircle(x, y, (s * 0.4).toNumber() + 1);
+        dc.setColor(0xFFFFFF, Graphics.COLOR_TRANSPARENT);
+        dc.fillCircle(x, y, (s * 0.4).toNumber());
+        // head
+        var hx = (x + dir * s * 0.5).toNumber();
+        var hy = (y - s * 0.15).toNumber();
+        dc.fillCircle(hx, hy, (s * 0.22).toNumber());
+        // wings (grey, flapping)
+        dc.setColor(0xD8DEE6, Graphics.COLOR_TRANSPARENT);
+        dc.fillPolygon([
+            [x, (y - s * 0.1).toNumber()],
+            [(x - s * 1.6).toNumber(), tipY],
+            [(x - s * 0.5).toNumber(), (y + s * 0.2).toNumber()]
+        ] as Array<Array>);
+        dc.fillPolygon([
+            [x, (y - s * 0.1).toNumber()],
+            [(x + s * 1.6).toNumber(), tipY],
+            [(x + s * 0.5).toNumber(), (y + s * 0.2).toNumber()]
+        ] as Array<Array>);
+        // dark wing tips
+        dc.setColor(0x3A3A42, Graphics.COLOR_TRANSPARENT);
+        dc.fillCircle((x - s * 1.6).toNumber(), tipY, 2);
+        dc.fillCircle((x + s * 1.6).toNumber(), tipY, 2);
+        // beak + eye
+        dc.setColor(0xF2A024, Graphics.COLOR_TRANSPARENT);
+        dc.fillPolygon([
+            [(hx + dir * s * 0.15).toNumber(), (hy - 1).toNumber()],
+            [(hx + dir * s * 0.55).toNumber(), (hy + s * 0.08).toNumber()],
+            [(hx + dir * s * 0.15).toNumber(), (hy + s * 0.16).toNumber()]
+        ] as Array<Array>);
+        dc.setColor(0x201008, Graphics.COLOR_TRANSPARENT);
+        dc.fillCircle((hx + dir * s * 0.05).toNumber(), (hy - 1).toNumber(), 1);
+    }
+
+    private function seagullWalk(dc as Dc, x as Number, y as Number, dir as Number, frac as Float, s as Number) as Void {
+        // two thin legs, alternating as it steps
+        var step = Math.sin(frac * Math.PI * 16.0) * s * 0.25;
+        dc.setColor(0xF2A024, Graphics.COLOR_TRANSPARENT);
+        dc.setPenWidth(2);
+        dc.drawLine((x - s * 0.15).toNumber(), (y - s * 0.3).toNumber(), (x - s * 0.15 + step).toNumber(), (y + s * 0.4).toNumber());
+        dc.drawLine((x + s * 0.15).toNumber(), (y - s * 0.3).toNumber(), (x + s * 0.15 - step).toNumber(), (y + s * 0.4).toNumber());
+        dc.setPenWidth(1);
+        // upright body (white, dark outline)
+        dc.setColor(0x000000, Graphics.COLOR_TRANSPARENT);
+        dc.fillCircle(x, (y - s * 0.4).toNumber(), (s * 0.45).toNumber() + 1);
+        dc.setColor(0xFFFFFF, Graphics.COLOR_TRANSPARENT);
+        dc.fillCircle(x, (y - s * 0.4).toNumber(), (s * 0.45).toNumber());
+        // folded grey wing
+        dc.setColor(0xD8DEE6, Graphics.COLOR_TRANSPARENT);
+        dc.fillRoundedRectangle((x - s * 0.25).toNumber(), (y - s * 0.55).toNumber(), (s * 0.7).toNumber(), (s * 0.42).toNumber(), 3);
+        // head + beak + eye
+        var hx = (x + dir * s * 0.35).toNumber();
+        var hy = (y - s * 0.85).toNumber();
+        dc.setColor(0xFFFFFF, Graphics.COLOR_TRANSPARENT);
+        dc.fillCircle(hx, hy, (s * 0.25).toNumber());
+        dc.setColor(0xF2A024, Graphics.COLOR_TRANSPARENT);
+        dc.fillPolygon([
+            [(hx + dir * s * 0.15).toNumber(), (hy - 1).toNumber()],
+            [(hx + dir * s * 0.6).toNumber(), (hy + s * 0.08).toNumber()],
+            [(hx + dir * s * 0.15).toNumber(), (hy + s * 0.18).toNumber()]
+        ] as Array<Array>);
+        dc.setColor(0x201008, Graphics.COLOR_TRANSPARENT);
+        dc.fillCircle((hx + dir * s * 0.05).toNumber(), (hy - 1).toNumber(), 1);
+    }
+
+    // ---- Dolphin (leaps from the sea in a smooth arc) ----
+    private function drawDolphin(dc as Dc, x as Number, y as Number, dir as Number, noseUp as Boolean, s as Number) as Void {
+        if (s < 9) { s = 9; }
+        var tilt = noseUp ? 0.5 : -0.5;
+        // dark outline (slightly larger), then steel-grey body
+        dolphinBody(dc, x, y, dir, tilt, (s * 1.12).toNumber(), 0x000000);
+        dolphinBody(dc, x, y, dir, tilt, s, 0x5E7E8E);
+        // pale belly + eye
+        dc.setColor(0xCDE2EC, Graphics.COLOR_TRANSPARENT);
+        dc.fillCircle(crX(x, dir, s * 0.2), crY(y, s * 0.2, -s * 0.3, tilt), (s * 0.3).toNumber());
+        dc.setColor(0x10202A, Graphics.COLOR_TRANSPARENT);
+        dc.fillCircle(crX(x, dir, s * 1.0), crY(y, s * 1.0, s * 0.25, tilt), 2);
+    }
+
+    private function dolphinBody(dc as Dc, x as Number, y as Number, dir as Number, tilt as Float, s as Number, c as Number) as Void {
+        dc.setColor(c, Graphics.COLOR_TRANSPARENT);
+        // main body: nose -> top back -> behind dorsal -> tail stalk -> belly -> chin
+        dc.fillPolygon([
+            [crX(x, dir, s * 1.7),  crY(y, s * 1.7,  s * 0.1,  tilt)],
+            [crX(x, dir, s * 0.3),  crY(y, s * 0.3,  s * 0.55, tilt)],
+            [crX(x, dir, -s * 0.6), crY(y, -s * 0.6, s * 0.45, tilt)],
+            [crX(x, dir, -s * 1.5), crY(y, -s * 1.5, s * 0.2,  tilt)],
+            [crX(x, dir, -s * 1.5), crY(y, -s * 1.5, -s * 0.15, tilt)],
+            [crX(x, dir, -s * 0.3), crY(y, -s * 0.3, -s * 0.45, tilt)],
+            [crX(x, dir, s * 1.1),  crY(y, s * 1.1,  -s * 0.3, tilt)]
+        ] as Array<Array>);
+        // dorsal fin
+        dc.fillPolygon([
+            [crX(x, dir, s * 0.1),  crY(y, s * 0.1,  s * 0.55, tilt)],
+            [crX(x, dir, -s * 0.2), crY(y, -s * 0.2, s * 1.3,  tilt)],
+            [crX(x, dir, -s * 0.6), crY(y, -s * 0.6, s * 0.5,  tilt)]
+        ] as Array<Array>);
+        // tail fluke
+        dc.fillPolygon([
+            [crX(x, dir, -s * 1.4), crY(y, -s * 1.4, s * 0.05, tilt)],
+            [crX(x, dir, -s * 2.1), crY(y, -s * 2.1, s * 0.5,  tilt)],
+            [crX(x, dir, -s * 2.1), crY(y, -s * 2.1, -s * 0.5, tilt)]
+        ] as Array<Array>);
+    }
+
+    // ---- Whale (breaches from the sea, nose-up, with a spout and splash) ----
+    private function drawWhale(dc as Dc, x as Number, y as Number, dir as Number, frac as Float, s as Number) as Void {
+        if (s < 14) { s = 14; }
+        var tilt = 0.8;  // strong nose-up breach
+        // foam/splash at the waterline base
+        dc.setColor(0xEAF4FA, Graphics.COLOR_TRANSPARENT);
+        dc.fillCircle((x - dir * s * 0.6).toNumber(), (y + s * 0.2).toNumber(), (s * 0.5).toNumber());
+        dc.fillCircle((x + dir * s * 0.3).toNumber(), (y + s * 0.3).toNumber(), (s * 0.4).toNumber());
+        // body: dark outline then deep blue-grey
+        whaleBody(dc, x, y, dir, tilt, (s * 1.08).toNumber(), 0x000000);
+        whaleBody(dc, x, y, dir, tilt, s, 0x33586E);
+        // pectoral flipper
+        dc.setColor(0x223F50, Graphics.COLOR_TRANSPARENT);
+        dc.fillPolygon([
+            [crX(x, dir, s * 0.3), crY(y, s * 0.3, -s * 0.3, tilt)],
+            [crX(x, dir, s * 1.0), crY(y, s * 1.0, -s * 1.4, tilt)],
+            [crX(x, dir, s * 0.6), crY(y, s * 0.6, -s * 0.1, tilt)]
+        ] as Array<Array>);
+        // a couple of belly grooves
+        dc.setColor(0x8FB0BE, Graphics.COLOR_TRANSPARENT);
+        for (var i = 0; i < 3; i++) {
+            dc.drawLine(
+                crX(x, dir, s * 1.3), crY(y, s * 1.3, -s * 0.4 - i * 2, tilt),
+                crX(x, dir, s * 0.2), crY(y, s * 0.2, -s * 0.6 - i * 2, tilt));
+        }
+        // eye
+        dc.setColor(0x0A1820, Graphics.COLOR_TRANSPARENT);
+        dc.fillCircle(crX(x, dir, s * 1.15), crY(y, s * 1.15, s * 0.35, tilt), 2);
+        // spout from the blowhole
+        var bhX = crX(x, dir, s * 0.9);
+        var bhY = crY(y, s * 0.9, s * 1.0, tilt);
+        dc.setColor(0xEAF4FA, Graphics.COLOR_TRANSPARENT);
+        dc.setPenWidth(2);
+        dc.drawLine(bhX, bhY, (bhX - dir * s * 0.2).toNumber(), (bhY - s * 0.9).toNumber());
+        dc.drawLine(bhX, bhY, (bhX + dir * s * 0.1).toNumber(), (bhY - s * 1.0).toNumber());
+        dc.drawLine(bhX, bhY, (bhX + dir * s * 0.4).toNumber(), (bhY - s * 0.8).toNumber());
+        dc.setPenWidth(1);
+        dc.fillCircle((bhX + dir * s * 0.1).toNumber(), (bhY - s * 1.05).toNumber(), 2);
+    }
+
+    private function whaleBody(dc as Dc, x as Number, y as Number, dir as Number, tilt as Float, s as Number, c as Number) as Void {
+        dc.setColor(c, Graphics.COLOR_TRANSPARENT);
+        // head top -> rostrum -> lower jaw -> belly -> tail underside -> tail top -> back
+        dc.fillPolygon([
+            [crX(x, dir, s * 1.4),  crY(y, s * 1.4,  s * 0.9,  tilt)],
+            [crX(x, dir, s * 1.75), crY(y, s * 1.75, s * 0.15, tilt)],
+            [crX(x, dir, s * 1.3),  crY(y, s * 1.3,  -s * 0.55, tilt)],
+            [crX(x, dir, 0.0),      crY(y, 0.0,      -s * 0.7, tilt)],
+            [crX(x, dir, -s * 1.6), crY(y, -s * 1.6, -s * 0.3, tilt)],
+            [crX(x, dir, -s * 1.6), crY(y, -s * 1.6, s * 0.4,  tilt)],
+            [crX(x, dir, -s * 0.3), crY(y, -s * 0.3, s * 0.95, tilt)]
+        ] as Array<Array>);
+        // tail fluke
+        dc.fillPolygon([
+            [crX(x, dir, -s * 1.5), crY(y, -s * 1.5, 0.0,      tilt)],
+            [crX(x, dir, -s * 2.2), crY(y, -s * 2.2, s * 0.6,  tilt)],
+            [crX(x, dir, -s * 2.2), crY(y, -s * 2.2, -s * 0.5, tilt)]
+        ] as Array<Array>);
+    }
+
     // ----------------------------------------------------------- Sun times
 
     // Recompute today's local sunrise/sunset from the watch's last-known
@@ -916,7 +1333,16 @@ class SummertimeView extends WatchUi.WatchFace {
             mSunrise = 6.0;
             mSunset = 18.0;
             mSunValid = false;
+            mSunLastTry = -10000;  // new day: allow an immediate retry
         }
+
+        // Not yet valid for today: a location fix (or a usable result) isn't
+        // available. Throttle retries so we don't run the location lookup + the
+        // heavy sunrise/sunset trig on every redraw while we wait.
+        var nowSec = Time.now().value();
+        if ((nowSec - mSunLastTry) < 60) { return; }
+        mSunLastTry = nowSec;
+
         var loc = getLocationDeg();
         if (loc == null) { return; }
         var offset = System.getClockTime().timeZoneOffset.toFloat() / 3600.0;
@@ -1002,16 +1428,23 @@ class SummertimeView extends WatchUi.WatchFace {
         return (y % 4 == 0 && y % 100 != 0) || (y % 400 == 0);
     }
 
+    // NOTE: these use bounded modulo arithmetic rather than `while` loops. A
+    // non-finite input (NaN/Infinity) from the sun math would make a subtract-
+    // in-a-loop spin forever and hang the watch face; modulo can never loop.
     private function normDeg(a as Float) as Float {
-        while (a < 0.0) { a += 360.0; }
-        while (a >= 360.0) { a -= 360.0; }
-        return a;
+        if (!(a > -1.0e9 && a < 1.0e9)) { return 0.0; }  // guard NaN / Infinity
+        var r = a - 360.0 * Math.floor(a / 360.0);
+        if (r < 0.0) { r += 360.0; }
+        if (r >= 360.0) { r -= 360.0; }
+        return r;
     }
 
     private function normHour(a as Float) as Float {
-        while (a < 0.0) { a += 24.0; }
-        while (a >= 24.0) { a -= 24.0; }
-        return a;
+        if (!(a > -1.0e9 && a < 1.0e9)) { return 0.0; }  // guard NaN / Infinity
+        var r = a - 24.0 * Math.floor(a / 24.0);
+        if (r < 0.0) { r += 24.0; }
+        if (r >= 24.0) { r -= 24.0; }
+        return r;
     }
 
     // ------------------------------------------------------------ Color helpers
@@ -1051,19 +1484,18 @@ class SummertimeView extends WatchUi.WatchFace {
         var sr = mSunrise;
         var ss = mSunset;
         var hours;
-        var topColors;
-        var bottomColors;
 
+        // The keyframe colors are identical for both schedules; only the hour
+        // anchors differ, so reuse the hoisted color tables and avoid rebuilding
+        // three nine-element arrays on every frame.
         if (sr > 1.6 && ss < 22.4 && (ss - sr) > 4.0) {
             var mid = (sr + ss) / 2.0;
-            hours        = [0.0, sr - 1.5, sr, sr + 1.5, mid, ss - 1.5, ss, ss + 1.5, 24.0];
-            topColors    = [0x050515, 0x0A0E29, 0x4A7A96, 0x1D8CF8, 0x1DA1F2, 0x3A86C8, 0xFF6F7D, 0x0F1123, 0x050515];
-            bottomColors = [0x0A0A25, 0x2C1B4D, 0xFF7B60, 0x8FE5D9, 0xFFF4E0, 0xFFAD87, 0xFFC043, 0x5C2E58, 0x0A0A25];
+            hours = [0.0, sr - 1.5, sr, sr + 1.5, mid, ss - 1.5, ss, ss + 1.5, 24.0];
         } else {
-            hours        = [0.0, 5.0, 7.0, 10.0, 14.0, 17.0, 19.5, 21.0, 24.0];
-            topColors    = [0x050515, 0x0A0E29, 0x4A7A96, 0x1D8CF8, 0x1DA1F2, 0x3A86C8, 0xFF6F7D, 0x0F1123, 0x050515];
-            bottomColors = [0x0A0A25, 0x2C1B4D, 0xFF7B60, 0x8FE5D9, 0xFFF4E0, 0xFFAD87, 0xFFC043, 0x5C2E58, 0x0A0A25];
+            hours = SKY_HOURS_FALLBACK;
         }
+        var topColors    = SKY_TOP;
+        var bottomColors = SKY_BOTTOM;
 
         var idx = 0;
         for (var i = 0; i < hours.size() - 1; i++) {
@@ -1078,6 +1510,46 @@ class SummertimeView extends WatchUi.WatchFace {
         var cBottom = lerpColor(bottomColors[idx], bottomColors[idx+1], frac);
 
         return [cTop, cBottom] as Array<Number>;
+    }
+
+    // Cached AMOLED sky gradient. Returns a buffered bitmap of the gradient, or
+    // null if buffered bitmaps aren't available / couldn't be allocated (the
+    // caller then renders the gradient directly). The expensive per-row fill loop
+    // only runs when the colors or dimensions change (≈once per minute) or when
+    // the graphics pool has reclaimed the previous buffer.
+    private function getSkyBitmap(w as Number, skyH as Number, cTop as Number, cBottom as Number) as Graphics.BufferedBitmap or Null {
+        if (!(Graphics has :createBufferedBitmap)) { return null; }
+
+        var bmp = (mSkyBufRef != null) ? mSkyBufRef.get() : null;
+        if (bmp != null && cTop == mSkyKeyTop && cBottom == mSkyKeyBottom && w == mSkyKeyW && skyH == mSkyKeyH) {
+            return bmp;  // cache hit
+        }
+
+        try {
+            var ref = Graphics.createBufferedBitmap({ :width => w, :height => skyH });
+            if (ref == null) { return null; }
+            mSkyBufRef = ref;
+            bmp = ref.get();
+            if (bmp == null) { return null; }
+
+            var bdc = bmp.getDc();
+            var step = 4;
+            for (var y = 0; y < skyH; y += step) {
+                var frac = y.toFloat() / skyH.toFloat();
+                var c = lerpColor(cTop, cBottom, frac);
+                bdc.setColor(c, Graphics.COLOR_TRANSPARENT);
+                bdc.fillRectangle(0, y, w, step);
+            }
+
+            mSkyKeyTop = cTop;
+            mSkyKeyBottom = cBottom;
+            mSkyKeyW = w;
+            mSkyKeyH = skyH;
+            return bmp;
+        } catch (e) {
+            mSkyBufRef = null;
+            return null;
+        }
     }
 
     // ----------------------------------------------------------- Lifecycle
@@ -1101,7 +1573,7 @@ class SummertimeView extends WatchUi.WatchFace {
                 var conditions = Weather.getCurrentConditions();
                 if (conditions != null && conditions.temperature != null) {
                     var temp = conditions.temperature;
-                    var settings = System.getDeviceSettings();
+                    var settings = (mSettings != null) ? mSettings : System.getDeviceSettings();
                     var isImperial = (settings has :temperatureUnits) && (settings.temperatureUnits != System.UNIT_METRIC);
                     if (isImperial) {
                         temp = (temp * 9.0 / 5.0 + 32.0).toNumber();
@@ -1201,12 +1673,62 @@ class SummertimeView extends WatchUi.WatchFace {
         }
     }
 
-    // Low-power partial update called once per second in sleep mode.
-    // Redraw only when the minute changes to stay within AMOLED power budget.
+    // Low-power partial update, called up to once per second in sleep mode.
+    //
+    // This MUST stay cheap: onPartialUpdate runs under a strict execution-time /
+    // power budget, and exceeding it repeatedly makes the system disable partial
+    // updates (the face "freezes" in always-on). The old implementation called
+    // the full onUpdate() here, clearing and re-rendering the ENTIRE screen,
+    // which is exactly what the budget forbids.
+    //
+    // The always-on layer shows no seconds, so nothing changes sub-minute. We
+    // therefore redraw only when the minute rolls over, clip to the central
+    // time/date band, and clear + repaint just that region.
+    //
+    // This cheap clipped path is ONLY safe on AMOLED always-on (burn-in) mode.
+    // On MIP devices the sleep frame is the full colour scene, so clipping +
+    // clearing a band here would paint a black rectangle over it; in that case
+    // we fall back to the original full redraw.
     function onPartialUpdate(dc as Dc) as Void {
-        var min = System.getClockTime().min;
+        var clock = System.getClockTime();
+        var min = clock.min;
         if (min == mLastMin) { return; }
         mLastMin = min;
-        onUpdate(dc);
+        mClock = clock;
+
+        var settings = System.getDeviceSettings();
+        mSettings = settings;  // cache for drawTime / getWeatherString this frame
+        var hasBurnIn = (settings has :requiresBurnInProtection) && settings.requiresBurnInProtection;
+        var aod = hasBurnIn && mIsSleep;
+
+        // Not AMOLED always-on (or no clip support): preserve the original
+        // full-scene minute refresh.
+        if (!aod || !(dc has :setClip)) {
+            onUpdate(dc);
+            return;
+        }
+
+        mLowPower = true;
+
+        // Match the anti-burn-in pixel shift used by the full minute redraw.
+        var shift = computeBurnInShift();
+        var cx = mCenterX + shift[0];
+        var cy = mCenterY + shift[1];
+
+        // Clip to the central time/date band so the clear + redraw is bounded to
+        // a small region instead of the whole display.
+        var clipY = (mHeight * 0.30).toNumber();
+        var clipH = (mHeight * 0.34).toNumber();
+        if (dc has :setClip) { dc.setClip(0, clipY, mWidth, clipH); }
+
+        dc.setColor(BG_COLOR, BG_COLOR);
+        dc.clear();
+
+        drawTime(dc, cx, cy - (mHeight * 0.05).toNumber());
+        if (mShowDate) {
+            drawDate(dc, cx, cy + (mHeight * 0.06).toNumber());
+        }
+
+        if (dc has :clearClip) { dc.clearClip(); }
     }
 }

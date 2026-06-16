@@ -4,6 +4,19 @@ All notable changes to Summertime are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project aims to
 follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.0] - 2026-06-16
+
+### Added
+- **Beach critters**: little visitors now cross the screen once in a while — a crab scuttles across the sand and a seagull glides down, walks a few steps, and takes off by day; a dolphin leaps and a whale breaches (with a spout and splash) from the sea, day or night. They appear only briefly and quietly, and can be turned off with the new **Show Critters** setting.
+
+### Fixed
+- **Always-on freezing**: `onPartialUpdate` no longer re-renders the entire screen every minute — on AMOLED always-on it clips to the time/date band and repaints just that — which was the primary cause of the watch face freezing in always-on mode. (MIP devices keep the original full redraw.)
+- **Seconds marker z-order**: the orbiting citrus-slice seconds marker now draws above the time, date, complications, and steps bar instead of being hidden behind the bottom text.
+- Hardened the sunrise/sunset math against a potential infinite loop (non-finite angle normalization now uses bounded modulo), and fixed a drifting cloud that could wrap off-screen (negative modulo).
+
+### Changed
+- **Performance**: the AMOLED sky gradient is now cached in a buffered bitmap and only re-rendered when its colors change (about once a minute) instead of every frame; per-frame device-settings, clock, and activity-info lookups are cached; wave/star/sky arrays are no longer reallocated each frame; and the weather lookup is skipped in always-on. Together these cut the per-second render cost substantially.
+
 ## [1.2.0] - 2026-06-15
 
 ### Added

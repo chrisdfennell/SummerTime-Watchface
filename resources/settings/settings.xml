@@ -32,4 +32,9 @@
             <listEntry value="5">@Strings.CompCalories</listEntry>
         </settingConfig>
     </setting>
+
+    <!-- Toggle the little beach visitors that cross the screen -->
+    <setting propertyKey="@Properties.ShowCritters" title="@Strings.ShowCrittersTitle" prompt="@Strings.ShowCrittersPrompt">
+        <settingConfig type="boolean" />
+    </setting>
 </settings>

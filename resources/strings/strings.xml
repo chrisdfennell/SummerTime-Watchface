@@ -8,6 +8,9 @@
     <string id="StepGoalTitle">Step Goal Override</string>
     <string id="StepGoalPrompt">Steps for a full XP bar. Set 0 to use the watch's own daily step goal.</string>
 
+    <string id="ShowCrittersTitle">Show Critters</string>
+    <string id="ShowCrittersPrompt">Let little visitors cross the beach once in a while — a crab scuttles across the sand and a seagull lands and walks by day; a dolphin leaps and a whale breaches from the sea.</string>
+
     <!-- Complication pickers -->
     <string id="LeftCompTitle">Bottom-Left Complication</string>
     <string id="RightCompTitle">Bottom-Right Complication</string>
