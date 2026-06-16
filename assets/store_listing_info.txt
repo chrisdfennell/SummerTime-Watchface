@@ -14,37 +14,37 @@ Summertime — Golden-Hour Beach Watch Face
 ------------------------------------------------------------------------
 FIELD: Description (Max 4000 characters)
 ------------------------------------------------------------------------
-Summertime is a premium, high-fidelity digital watch face featuring a warm, relaxing golden-hour beach aesthetic. Experience a living sky, drifting clouds, rolling waves, and a swaying palm silhouette, all procedurally rendered. Large, outlined digital time and clean complications keep you connected and styled for summer.
+Summertime is a premium, high-fidelity digital watch face featuring a warm, relaxing golden-hour beach aesthetic. Experience a living sky, drifting clouds, rolling waves, and a swaying palm silhouette, all procedurally rendered. Large, outlined digital time and configurable complications keep you connected and styled for summer.
 
 FEATURES & DETAILS
 • LIVING SKY GRADIENT: A procedural backdrop that shifts colors dynamically by time of day (sunrise pastels, midday azure, sunset marigold, and a starry deep night).
-• ARCING SUN & MOON: Day/night orbital progression of a glowing sun (with rotating rays and bloom) and crescent silver moon.
+• REAL SUNRISE & SUNSET: The sun, day/night swap, stars, and sky gradient track the actual sunrise/sunset for your location and date, so golden hour lands when it really happens (falls back to a fixed summer schedule when no location is available — no GPS is ever powered on).
+• ARCING SUN & MOON: Day/night orbital progression of a glowing sun (with rotating rays and bloom) and crescent silver moon along the real day arc.
 • PROCEDURAL ANIMATIONS: Drifting fluffy clouds, rolling wave layers with physics, and a swaying palm tree silhouette at the beach.
-• ROTATING SECONDS: A sliced orange second indicator floating and orbiting the perimeter.
-• DYNAMIC COMPLICATIONS:
-  - Heart Icon (coral-colored, 16px with black outline) + Body Battery percentage.
-  - Water Droplet Icon (turquoise-colored, 12px with black outline) + device battery percentage.
-  - Steps Bar (XP tracker, sand/gold shoreline) + numeric steps count.
-• HIGH-CONTRAST OUTLINES: All texts (clock, date, weather, and battery metrics) feature a crisp black outline for absolute readability against the dynamic visual backdrops.
+• ROTATING SECONDS: A sliced orange second indicator, with a dark rind border for legibility, floating and orbiting the perimeter.
+• CONFIGURABLE COMPLICATIONS: Choose what the bottom-left and bottom-right show — Heart Rate, Body Battery, Device Battery, Steps, Calories, or Off — each with a matching themed icon (heart, bolt, battery with live fill bar, shoe, flame). Defaults: left = Heart Rate, right = Device Battery.
+• STEPS SHORELINE BAR: A sand/gold steps progress bar with numeric step count, always shown beneath the time.
+• HIGH-CONTRAST OUTLINES: All texts (clock, date, weather, and metrics) feature a crisp black outline for absolute readability against the dynamic visual backdrops.
 
 BUILT FOR YOUR DISPLAY
-Summertime adapts to your panel:
-• AMOLED (Fenix 8 / tactix 8 / quatix 8 and Fenix 8 Pro): smooth gradient resource fills, specular highlights, and active background illumination.
-• MIP / Solar (tactix 8 Solar, Fenix 8 Solar): high-contrast flat fills and optimized backdrops tuned for maximum sunlight readability.
-Everything is laid out relative to your screen, so it looks right on every supported case size.
+Summertime now runs on virtually every Connect IQ round watch and adapts to your panel:
+• AMOLED (Fenix 8 / tactix 8 / Fenix 8 Pro, Forerunner 965/970, Venu, epix, Instinct AMOLED, and more): smooth gradient fills, specular highlights, and active background illumination.
+• MIP / Solar (Fenix 7/8 Solar, Forerunner 255/955, Instinct, enduro): high-contrast flat fills and optimized backdrops tuned for maximum sunlight readability.
+Everything is laid out relative to your screen, with a correctly-sized font set baked for each resolution, so it looks right on every supported case size.
 
 ALWAYS-ON FRIENDLY
-On AMOLED, the always-on display switches to a burn-in-safe variant — dim grey time/date, thin outline representations of the battery metrics, steps progress outline, and no visual fills or background animations. All lit pixels are shifted a few pixels each minute. MIP panels always show the full face.
+On AMOLED, the always-on display switches to a burn-in-safe variant — dim grey time/date, thin outline representations of the complications, steps progress outline, and no visual fills or background animations. All lit pixels are shifted a few pixels each minute. MIP panels always show the full face.
 
 SETTINGS
 • Show Date — toggle the date line.
 • Step Goal Override — steps for a full shoreline bar; 0 uses the watch's own step goal.
+• Bottom-Left Complication / Bottom-Right Complication — pick Heart Rate, Body Battery, Device Battery, Steps, Calories, or Off for each side.
 
 PRIVACY
-Summertime uses only the SensorHistory permission to read Body Battery. It does not collect or transmit any data off your watch.
+Summertime uses only the SensorHistory permission to read Body Battery. Sunrise/sunset is computed from your watch's last-known location (it does not turn on GPS). It does not collect or transmit any data off your watch.
 
 SUPPORTED DEVICES
-tactix 8 (AMOLED & Solar), Fenix 8 (43/47/51mm AMOLED), Fenix 8 Solar, Fenix 8 Pro, quatix 8, Forerunner 965.
+Every Connect IQ 4.0+ round watch that supports watch faces, including: Forerunner 165 / 255 / 265 / 570 / 955 / 965 / 970; fenix 7 & 8 (incl. S/X/Pro, AMOLED & Solar), fenix E, epix 2 / Pro, enduro 3; tactix 8; Venu 2 / 3, Venu 4, Vivoactive 5 / 6; Instinct 3 / E / Crossover (AMOLED); and the Approach (golf), Descent (dive), D2 (aviation), and MARQ specialty watches. (Square/rectangular panels and Edge/handheld GPS units are not supported.)
 
 Equip Summertime, and take a moment at the beach.
 
@@ -52,16 +52,22 @@ Equip Summertime, and take a moment at the beach.
 ------------------------------------------------------------------------
 FIELD: What's New in this Version (Max 4000 characters)
 ------------------------------------------------------------------------
-Version 1.0.0 — Initial Release
+Version 1.2.0
 
-Summertime is now available for all Fenix 8 and tactix 8 models!
+• CONFIGURABLE COMPLICATIONS: Set the bottom-left and bottom-right to Heart Rate, Body Battery, Device Battery, Steps, Calories, or Off — each with its own themed icon. Device Battery now shows a battery icon with a live fill bar. Defaults: left = Heart Rate, right = Device Battery.
+• REAL SUNRISE & SUNSET: The sun, day/night, stars, and sky gradient now follow the actual sunrise/sunset for your location and date (no GPS is powered on; falls back to a fixed summer schedule with no fix).
+• BROAD DEVICE SUPPORT: Summertime now runs on virtually every Connect IQ 4.0+ round watch — Forerunner (incl. 965/970), fenix 7/8, epix 2/Pro, enduro 3, Venu, Vivoactive, Instinct, and the Approach/Descent/D2/MARQ specialty watches — with a correctly-sized font set for each resolution.
+• Citrus-slice seconds indicator now has a dark border for legibility.
+
+Thanks for wearing Summertime!
+
+---
+
+Version 1.0.0 — Initial Release
 
 • Full support for AMOLED and MIP (Solar) screens.
 • High-contrast text outlining for perfect readability against moving wave and sky backdrops.
-• Symmetrical complications layout (larger Heart and Droplet icons with clean borders).
 • Smooth time-of-day sky color gradient shifts and celestial orbits.
-
-Thanks for wearing Summertime!
 
 
 ------------------------------------------------------------------------
