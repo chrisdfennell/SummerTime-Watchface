@@ -54,6 +54,15 @@ Equip Summertime, and take a moment at the beach.
 ------------------------------------------------------------------------
 FIELD: What's New in this Version (Max 4000 characters)
 ------------------------------------------------------------------------
+Version 1.3.1
+
+• SMOOTHER ON AMOLED: Fixed a freeze where the seconds marker could stop moving while you were looking at the watch, caused by the sky buffer being rebuilt too often. The scene now stays lively without bogging down over time.
+• ADAPTIVE QUALITY: The face now measures its own render speed and automatically tunes fine detail to keep animations smooth on every device — the whole beach keeps moving, it just sheds tiny details only where hardware needs it.
+
+Thanks for wearing Summertime!
+
+---
+
 Version 1.3.0
 
 • BEACH CRITTERS: Little visitors now cross the screen once in a while — a crab scuttles across the sand and a seagull glides down, walks, and takes off by day; a dolphin leaps and a whale breaches (with a spout and splash) from the sea, day or night. They're brief and occasional, and can be turned off with the new Show Critters setting.

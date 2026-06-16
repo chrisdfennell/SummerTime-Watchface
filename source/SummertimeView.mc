@@ -136,6 +136,16 @@ class SummertimeView extends WatchUi.WatchFace {
     private var mSkyKeyW as Number = -1;
     private var mSkyKeyH as Number = -1;
 
+    // --- Adaptive render quality (auto-tunes to the device's frame budget) ---
+    // onUpdate times itself and nudges mQuality up/down with hysteresis. Expensive
+    // detail (text-outline passes, palm segments, sun rays, gradient fineness)
+    // scales with it, so a slow/large panel sheds just enough detail to stay
+    // smooth while the whole scene keeps animating. 3 = full detail, 0 = leanest.
+    private var mQuality as Number = 2;
+    private var mFrameStart as Number = 0;
+    private const Q_SLOW_MS = 220;  // frame slower than this -> drop a level
+    private const Q_FAST_MS = 120;  // frame faster than this -> raise a level
+
     function initialize() {
         WatchFace.initialize();
         loadSettings();
@@ -206,6 +216,7 @@ class SummertimeView extends WatchUi.WatchFace {
 
     // Single render entry point for both active and low-power frames.
     function onUpdate(dc as Dc) as Void {
+        mFrameStart = System.getTimer();  // adaptive-quality frame timer
         var w = mWidth;
         var h = mHeight;
 
@@ -310,18 +321,20 @@ class SummertimeView extends WatchUi.WatchFace {
                 if (sunSkyFrac > 1.0) { sunSkyFrac = 1.0; }
                 var sunSkyColor = lerpColor(cTop, cBottom, sunSkyFrac);
 
-                // Rays rotation based on seconds
-                dc.setColor(0xFFC043, Graphics.COLOR_TRANSPARENT);
-                dc.setPenWidth(1);
-                var numRays = 8;
-                var secOffset = secVal.toFloat() * 0.02;
-                for (var i = 0; i < numRays; i++) {
-                    var rayAngle = (i * (2.0 * Math.PI / numRays)) + secOffset;
-                    var rx1 = (sx + (sunR + 2) * Math.cos(rayAngle)).toNumber();
-                    var ry1 = (sy + (sunR + 2) * Math.sin(rayAngle)).toNumber();
-                    var rx2 = (sx + (sunR + 8) * Math.cos(rayAngle)).toNumber();
-                    var ry2 = (sy + (sunR + 8) * Math.sin(rayAngle)).toNumber();
-                    dc.drawLine(rx1, ry1, rx2, ry2);
+                // Rays rotation based on seconds (skipped at low quality)
+                if (mQuality >= 2) {
+                    dc.setColor(0xFFC043, Graphics.COLOR_TRANSPARENT);
+                    dc.setPenWidth(1);
+                    var numRays = 8;
+                    var secOffset = secVal.toFloat() * 0.02;
+                    for (var i = 0; i < numRays; i++) {
+                        var rayAngle = (i * (2.0 * Math.PI / numRays)) + secOffset;
+                        var rx1 = (sx + (sunR + 2) * Math.cos(rayAngle)).toNumber();
+                        var ry1 = (sy + (sunR + 2) * Math.sin(rayAngle)).toNumber();
+                        var rx2 = (sx + (sunR + 8) * Math.cos(rayAngle)).toNumber();
+                        var ry2 = (sy + (sunR + 8) * Math.sin(rayAngle)).toNumber();
+                        dc.drawLine(rx1, ry1, rx2, ry2);
+                    }
                 }
 
                 // Procedural bloom
@@ -432,6 +445,16 @@ class SummertimeView extends WatchUi.WatchFace {
             var csx = cx + (secRadius * Math.sin(secAngle)).toNumber();
             var csy = cy - (secRadius * Math.cos(secAngle)).toNumber();
             drawCitrusSlice(dc, csx, csy);
+
+            // Adaptive quality: measure how long this active frame took and nudge
+            // the detail level so the watch keeps issuing per-second updates
+            // (i.e. the seconds marker keeps moving) instead of hitting the budget.
+            var dt = System.getTimer() - mFrameStart;
+            if (dt > Q_SLOW_MS) {
+                if (mQuality > 0) { mQuality--; }
+            } else if (dt < Q_FAST_MS) {
+                if (mQuality < 3) { mQuality++; }
+            }
         }
     }
 
@@ -523,8 +546,12 @@ class SummertimeView extends WatchUi.WatchFace {
     }
 
     private function drawPalmTree(dc as Dc, tx as Number, ty as Number, cx as Number, cy as Number, sway as Float) as Void {
+        // Trunk + frond detail scale with adaptive quality (the palm is ~100
+        // line draws at full detail, so it sheds segments first under load).
+        var trunkSteps = (mQuality >= 3) ? 12 : (mQuality == 2) ? 10 : 8;
+        var leafSteps  = (mQuality >= 3) ? 7  : (mQuality == 2) ? 6  : (mQuality == 1) ? 5 : 4;
+
         // Draw trunk
-        var trunkSteps = 12;
         var trunkColor = 0x241C10; // Dark brown
         dc.setColor(trunkColor, Graphics.COLOR_TRANSPARENT);
         for (var i = 0; i <= trunkSteps; i++) {
@@ -539,15 +566,14 @@ class SummertimeView extends WatchUi.WatchFace {
         // Draw 5 leaves with wind sway
         var leafLen = (mWidth * 0.08).toNumber();
         var leafColor = 0x1A2812; // Silhouette green
-        drawPalmLeaf(dc, cx, cy, -2.6 + sway, leafLen, leafColor);
-        drawPalmLeaf(dc, cx, cy, -1.9 + sway, leafLen, leafColor);
-        drawPalmLeaf(dc, cx, cy, -1.2 + sway, leafLen, leafColor);
-        drawPalmLeaf(dc, cx, cy, -0.5 + sway, leafLen, leafColor);
-        drawPalmLeaf(dc, cx, cy, 0.2 + sway, leafLen, leafColor);
+        drawPalmLeaf(dc, cx, cy, -2.6 + sway, leafLen, leafColor, leafSteps);
+        drawPalmLeaf(dc, cx, cy, -1.9 + sway, leafLen, leafColor, leafSteps);
+        drawPalmLeaf(dc, cx, cy, -1.2 + sway, leafLen, leafColor, leafSteps);
+        drawPalmLeaf(dc, cx, cy, -0.5 + sway, leafLen, leafColor, leafSteps);
+        drawPalmLeaf(dc, cx, cy, 0.2 + sway, leafLen, leafColor, leafSteps);
     }
 
-    private function drawPalmLeaf(dc as Dc, lx as Number, ly as Number, angle as Float, length as Number, leafColor as Number) as Void {
-        var steps = 7;
+    private function drawPalmLeaf(dc as Dc, lx as Number, ly as Number, angle as Float, length as Number, leafColor as Number, steps as Number) as Void {
         var stepLen = length / steps;
         var prevX = lx;
         var prevY = ly;
@@ -1521,17 +1547,30 @@ class SummertimeView extends WatchUi.WatchFace {
         if (!(Graphics has :createBufferedBitmap)) { return null; }
 
         var bmp = (mSkyBufRef != null) ? mSkyBufRef.get() : null;
-        if (bmp != null && cTop == mSkyKeyTop && cBottom == mSkyKeyBottom && w == mSkyKeyW && skyH == mSkyKeyH) {
-            return bmp;  // cache hit
+
+        // Allocate the buffer ONCE (or only re-allocate if the graphics pool
+        // reclaimed it, or the size changed). Recreating it every minute just
+        // because the colors changed churns the pool and can exhaust it over
+        // time, which silently drops us into the slow per-frame fallback below.
+        if (bmp == null || w != mSkyKeyW || skyH != mSkyKeyH) {
+            try {
+                var ref = Graphics.createBufferedBitmap({ :width => w, :height => skyH });
+                if (ref == null) { mSkyBufRef = null; return null; }
+                mSkyBufRef = ref;
+                bmp = ref.get();
+                if (bmp == null) { return null; }
+            } catch (e) {
+                mSkyBufRef = null;
+                return null;
+            }
+            mSkyKeyW = w;
+            mSkyKeyH = skyH;
+            mSkyKeyTop = cTop + 1;  // invalidate so the gradient repaints below
         }
 
-        try {
-            var ref = Graphics.createBufferedBitmap({ :width => w, :height => skyH });
-            if (ref == null) { return null; }
-            mSkyBufRef = ref;
-            bmp = ref.get();
-            if (bmp == null) { return null; }
-
+        // Repaint into the EXISTING buffer only when the colors change (~once a
+        // minute), reusing the same allocation instead of making a new one.
+        if (cTop != mSkyKeyTop || cBottom != mSkyKeyBottom) {
             var bdc = bmp.getDc();
             var step = 4;
             for (var y = 0; y < skyH; y += step) {
@@ -1540,16 +1579,10 @@ class SummertimeView extends WatchUi.WatchFace {
                 bdc.setColor(c, Graphics.COLOR_TRANSPARENT);
                 bdc.fillRectangle(0, y, w, step);
             }
-
             mSkyKeyTop = cTop;
             mSkyKeyBottom = cBottom;
-            mSkyKeyW = w;
-            mSkyKeyH = skyH;
-            return bmp;
-        } catch (e) {
-            mSkyBufRef = null;
-            return null;
         }
+        return bmp;
     }
 
     // ----------------------------------------------------------- Lifecycle
@@ -1595,15 +1628,27 @@ class SummertimeView extends WatchUi.WatchFace {
             dc.drawText(x, y, font, text, justify);
             return;
         }
+        // Outline cost scales with adaptive quality. The long date line is the
+        // single most expensive text, so shedding outline passes here is the
+        // biggest per-frame win when the device is struggling:
+        //   q>=3 -> full 8-neighbour outline; q==2 -> 4 diagonals;
+        //   q==1 -> 2 diagonals;             q==0 -> no outline.
         dc.setColor(0x000000, Graphics.COLOR_TRANSPARENT);
-        dc.drawText(x - 1, y - 1, font, text, justify);
-        dc.drawText(x + 1, y - 1, font, text, justify);
-        dc.drawText(x - 1, y + 1, font, text, justify);
-        dc.drawText(x + 1, y + 1, font, text, justify);
-        dc.drawText(x - 1, y,     font, text, justify);
-        dc.drawText(x + 1, y,     font, text, justify);
-        dc.drawText(x,     y - 1, font, text, justify);
-        dc.drawText(x,     y + 1, font, text, justify);
+        if (mQuality >= 2) {
+            dc.drawText(x - 1, y - 1, font, text, justify);
+            dc.drawText(x + 1, y - 1, font, text, justify);
+            dc.drawText(x - 1, y + 1, font, text, justify);
+            dc.drawText(x + 1, y + 1, font, text, justify);
+            if (mQuality >= 3) {
+                dc.drawText(x - 1, y,     font, text, justify);
+                dc.drawText(x + 1, y,     font, text, justify);
+                dc.drawText(x,     y - 1, font, text, justify);
+                dc.drawText(x,     y + 1, font, text, justify);
+            }
+        } else if (mQuality == 1) {
+            dc.drawText(x - 1, y - 1, font, text, justify);
+            dc.drawText(x + 1, y + 1, font, text, justify);
+        }
         dc.setColor(textColor, Graphics.COLOR_TRANSPARENT);
         dc.drawText(x, y, font, text, justify);
     }

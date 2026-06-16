@@ -4,6 +4,14 @@ All notable changes to Summertime are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project aims to
 follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.1] - 2026-06-16
+
+### Fixed
+- **AMOLED freezing while active (tactix 8 / fenix 8)**: the sky-gradient buffer was being reallocated every minute, which could exhaust the graphics pool over time and drop the watch face into a slow render path — the seconds marker would stop moving while you were looking at it. It now allocates once and repaints in place.
+
+### Changed
+- **Adaptive render quality**: the watch face now measures its own render time and automatically scales fine visual detail (text-outline passes, palm-frond detail, sun rays) up or down to stay within the device's per-second update budget. The full scene keeps animating — only fine detail is shed, and only on hardware that needs it — so the seconds marker keeps moving smoothly.
+
 ## [1.3.0] - 2026-06-16
 
 ### Added

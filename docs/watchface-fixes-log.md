@@ -336,6 +336,85 @@ dim AOD date identical between the full and partial redraws (no flicker).
 
 ---
 
+## 2026-06-16 (later) — tactix 8 still froze "while actively looking"
+
+Hardware report: on a real tactix 8 (AMOLED 454) the seconds marker **stopped
+moving while actively looking** (not the normal always-on transition). That means
+the per-second high-power `onUpdate` was too heavy for the device's update budget,
+so the OS stopped issuing per-second updates. The simulator does NOT enforce this
+timing, so it looked fine there. Two fixes — and crucially, **the scene keeps
+animating** (the per-minute "bake the whole scene" idea was rejected on purpose).
+
+### Fix #12 — `BufferedBitmap` leak: allocate once, repaint in place  ⭐ Portable: YES
+
+**Regression from Fix #9.** `getSkyBitmap` called `Graphics.createBufferedBitmap`
+**every minute** (whenever the gradient colors changed). On real hardware that
+churns the graphics pool; once it's exhausted, `createBufferedBitmap` starts
+failing, we fall into the slow per-frame 86-fill fallback **forever**, and the
+face bogs down / freezes the longer you wear it.
+
+**Fix:** allocate the buffer ONCE (re-allocate only if the pool reclaimed it or
+the size changed), and just repaint the gradient into the *existing* buffer when
+the colors change:
+```monkeyc
+var bmp = (mSkyBufRef != null) ? mSkyBufRef.get() : null;
+if (bmp == null || w != mSkyKeyW || skyH != mSkyKeyH) {   // allocate ONCE
+    var ref = Graphics.createBufferedBitmap({ :width => w, :height => skyH });
+    ... mSkyBufRef = ref; bmp = ref.get(); ...
+    mSkyKeyTop = cTop + 1;   // invalidate so it repaints below
+}
+if (cTop != mSkyKeyTop || cBottom != mSkyKeyBottom) {     // repaint IN PLACE
+    var bdc = bmp.getDc(); /* gradient fill loop */ ...
+}
+```
+**Lesson (general):** never call `createBufferedBitmap` on a hot path keyed on a
+value that changes — allocate once, reuse `getDc()`. Recreating = pool churn = OOM.
+
+### Fix #13 — Adaptive render quality (self-tuning to the device)  ⭐ Portable: YES
+
+Instead of hardcoding detail cuts (and guessing per device), `onUpdate` measures
+its own render time with `System.getTimer()` and nudges an `mQuality` level
+(0..3) up/down with hysteresis. Expensive detail scales with it, so the scene
+**keeps fully animating** and only sheds detail on hardware that can't keep up —
+and it auto-fits a tactix 8 vs a tiny FR165 with no per-device guessing.
+
+```monkeyc
+private var mQuality as Number = 2;       // 3 = full detail, 0 = leanest
+private var mFrameStart as Number = 0;
+private const Q_SLOW_MS = 220;            // frame slower than this -> drop a level
+private const Q_FAST_MS = 120;            // faster than this -> raise a level
+
+// top of onUpdate:
+mFrameStart = System.getTimer();
+// end of onUpdate (active frames only):
+var dt = System.getTimer() - mFrameStart;
+if (dt > Q_SLOW_MS) { if (mQuality > 0) { mQuality--; } }
+else if (dt < Q_FAST_MS) { if (mQuality < 3) { mQuality++; } }
+```
+
+Knobs that read `mQuality` (tune per face):
+| Knob | q3 | q2 | q1 | q0 |
+|---|---|---|---|---|
+| `drawTextWithOutline` passes | 8 | 4 | 2 | 0 |
+| Palm trunk segments | 12 | 10 | 8 | 8 |
+| Palm leaf (frond) segments | 7 | 6 | 5 | 4 |
+| Sun rays | on | on | off | off |
+
+**How to port:** add the three fields + the timer at the top and the hysteresis
+at the bottom of `onUpdate` (active branch only — don't adapt in low-power/AOD).
+Then make each face's most expensive per-frame draws read `mQuality`. Pick the
+knobs by what's heavy in that face (here: the long outlined date text and the
+~100-line palm). Thresholds (220/120 ms) are starting points — tune to taste.
+
+**Why both:** #12 removes a real leak that forces the slow path; #13 guarantees
+that whatever the device's true budget is, the face throttles detail (not the
+animation) to stay under it. Together they target "freezes while actively looking"
+without flattening the living scene. NOTE: verified to build (AMOLED + MIP) and
+run in the simulator, but the simulator can't reproduce the hardware update-budget
+throttle — real-device confirmation is required.
+
+---
+
 ## Notes / general rules
 - **"Is it the freeze?"** — audit, in order: anything in `onPartialUpdate`
   (must be cheap + clipped), any `while` loop fed by float math (NaN/Inf = hang),
@@ -345,6 +424,10 @@ dim AOD date identical between the full and partial redraws (no flicker).
   rather than producing NaN/Inf, and the sky/arc divisions can't hit zero given
   the guarded ranges. The `drawTextWithOutline` 8-pass outline was kept as-is to
   avoid a visual change; drop it to 4 passes only if text cost ever matters.
-- All eleven fixes from 2026-06-16 are applied to Summertime and verified building
-  for AMOLED (`fenix847mm`) and MIP (`fenix7`, `fr165`); the seconds z-order and
-  the gradient-buffer path were confirmed running in the simulator.
+- **Adaptive quality (#13) is the general answer to "too heavy on device X":**
+  measure the frame, scale detail, keep the animation. Prefer it over hardcoded
+  per-device cuts.
+- All thirteen fixes from 2026-06-16 are applied to Summertime and verified
+  building for AMOLED (`fenix847mm`) and MIP (`fenix7`, `fr165`). Fixes #12/#13
+  target a hardware-only freeze the simulator can't reproduce — confirm on a real
+  tactix 8 before treating them as proven.
